@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Navbar from "@/components/Navbar";
 import InputField from "@/components/InputField";
 
@@ -15,6 +16,16 @@ export default function AutoDmReplyPage() {
   const [error, setError] = useState("");
   const [isCheckingActiveProcess, setIsCheckingActiveProcess] = useState(true);
   const router = useRouter();
+  const { data: session, status } = useSession();
+
+  // Redirect to sign-in page if not authenticated
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push(
+        `/auth/signin?callbackUrl=${encodeURIComponent("/tools/auto-dm-reply")}`
+      );
+    }
+  }, [status, router]);
 
   // Check if there's an active process when the component mounts
   useEffect(() => {
@@ -37,8 +48,13 @@ export default function AutoDmReplyPage() {
       }
     };
 
-    checkActiveProcess();
-  }, [router]);
+    // Only check for active processes if user is authenticated
+    if (status === "authenticated") {
+      checkActiveProcess();
+    } else if (status !== "loading") {
+      setIsCheckingActiveProcess(false);
+    }
+  }, [router, status]);
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -82,6 +98,21 @@ export default function AutoDmReplyPage() {
       setIsLoading(false);
     }
   };
+
+  // Show loading state while checking authentication
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white">
+        <Navbar />
+        <div className="container mx-auto px-4 pt-28 pb-16 flex items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block animate-spin h-8 w-8 border-4 border-gray-400 border-t-purple-600 rounded-full mb-4"></div>
+            <p className="text-gray-300">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading state while checking for active processes
   if (isCheckingActiveProcess) {

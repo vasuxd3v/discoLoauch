@@ -1,1 +1,11 @@
-{}
+{
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/monitoring/stats/route": "app/api/monitoring/stats/route.js",
+  "/api/tools/auto-dm-reply/route": "app/api/tools/auto-dm-reply/route.js",
+  "/api/tools/auto-messager/route": "app/api/tools/auto-messager/route.js",
+  "/api/tools/auto-status-updater/active-process/route": "app/api/tools/auto-status-updater/active-process/route.js",
+  "/monitoring/page": "app/monitoring/page.js",
+  "/page": "app/page.js",
+  "/tools/auto-messager/page": "app/tools/auto-messager/page.js",
+  "/tools/auto-messager/status/page": "app/tools/auto-messager/status/page.js"
+}

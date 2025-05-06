@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Navbar from "@/components/Navbar";
 import InputField from "@/components/InputField";
 
@@ -11,6 +13,17 @@ export default function AutoReplierPage() {
   const [replyContent, setReplyContent] = useState("");
   const [cooldown, setCooldown] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const { data: session, status } = useSession();
+
+  // Redirect to sign-in page if not authenticated
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push(
+        `/auth/signin?callbackUrl=${encodeURIComponent("/tools/auto-replier")}`
+      );
+    }
+  }, [status, router]);
 
   // Handle adding a new server input
   const handleAddServer = () => {
@@ -52,6 +65,21 @@ export default function AutoReplierPage() {
       alert("Auto Replier started successfully!");
     }, 1500);
   };
+
+  // Show loading state while checking authentication
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white">
+        <Navbar />
+        <div className="container mx-auto px-4 pt-28 pb-16 flex items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block animate-spin h-8 w-8 border-4 border-gray-400 border-t-indigo-600 rounded-full mb-4"></div>
+            <p className="text-gray-300">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
