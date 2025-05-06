@@ -13,6 +13,8 @@ export default function ToolsPage() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [selectedTool, setSelectedTool] = useState(null);
 
+  const isAuthorized = session?.user?.authorized === true;
+
   const tools = [
     {
       id: "auto-messager",
@@ -50,13 +52,18 @@ export default function ToolsPage() {
 
   const handleToolClick = (tool) => {
     const toolPath = `/tools/${tool.id}`;
-    if (session) {
-      // User is authenticated, redirect to the tool
-      router.push(toolPath);
-    } else {
+    if (!session) {
       // User is not authenticated, show login modal
       setSelectedTool(tool);
       setShowLoginModal(true);
+    } else if (!isAuthorized) {
+      // User is authenticated but not authorized
+      alert(
+        "You are not authorized to use this tool. Please contact the administrator."
+      );
+    } else {
+      // User is authenticated and authorized, redirect to the tool
+      router.push(toolPath);
     }
   };
 
@@ -94,11 +101,42 @@ export default function ToolsPage() {
           AutoXPulse Tools
         </h1>
 
+        {session && !isAuthorized && (
+          <div className="mb-8 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 dark:bg-yellow-800 dark:border-yellow-600 dark:text-yellow-200 rounded">
+            <div className="flex items-center">
+              <svg
+                className="w-6 h-6 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                ></path>
+              </svg>
+              <span className="font-medium">Authorization Required</span>
+            </div>
+            <p className="mt-2">
+              Your account is not authorized to use these tools. Please contact
+              the administrator or use the Discord bot{" "}
+              <code className="bg-yellow-200 dark:bg-yellow-900 px-1 py-0.5 rounded">
+                /authorize
+              </code>{" "}
+              command to gain access.
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {tools.map((tool) => (
             <div
               key={tool.id}
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 transition-all hover:shadow-xl hover:-translate-y-1 cursor-pointer"
+              className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 transition-all hover:shadow-xl hover:-translate-y-1 cursor-pointer ${
+                session && !isAuthorized ? "opacity-50" : ""
+              }`}
               onClick={() => handleToolClick(tool)}
             >
               <div className="flex flex-col h-full">
@@ -115,10 +153,15 @@ export default function ToolsPage() {
                 </p>
 
                 <button
-                  className="mt-auto w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-2 px-4 rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all focus:ring-2 focus:ring-blue-300 focus:outline-none"
+                  className={`mt-auto w-full py-2 px-4 rounded-lg transition-all focus:ring-2 focus:ring-blue-300 focus:outline-none ${
+                    session && !isAuthorized
+                      ? "bg-gray-400 text-white cursor-not-allowed"
+                      : "bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700"
+                  }`}
                   aria-label={`Use ${tool.name}`}
+                  disabled={session && !isAuthorized}
                 >
-                  Use Tool
+                  {session && !isAuthorized ? "Unauthorized" : "Use Tool"}
                 </button>
               </div>
             </div>

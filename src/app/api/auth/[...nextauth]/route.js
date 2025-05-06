@@ -5,6 +5,11 @@ import { getAdminDb } from "@/lib/firebase/firebase-admin";
 // Configure only the specific scopes we need
 const scopes = ["identify", "guilds"]; // 'identify' for user profile, 'guilds' for servers
 
+// Get authorized Discord IDs from environment variable
+const AUTHORIZED_DISCORD_IDS = (process.env.AUTHORIZED_DISCORD_IDS || "")
+  .split(",")
+  .map((id) => id.trim());
+
 const handler = NextAuth({
   providers: [
     DiscordProvider({
@@ -87,6 +92,27 @@ const handler = NextAuth({
               await db
                 .ref(`users/${session.user.discord.id}/servers`)
                 .set(simplifiedGuilds);
+
+              // Check if user is authorized and add to session
+              const authSnapshot = await db
+                .ref(`users/${session.user.discord.id}/authorized`)
+                .once("value");
+
+              // More flexible authorization check
+              const authValue = authSnapshot.val();
+              session.user.authorized =
+                authValue === true || authValue === "true" || authValue === 1;
+
+              // If user doesn't have an authorization status yet, set it to true by default
+              if (authValue === null || authValue === undefined) {
+                console.log(
+                  `Setting default authorization for new user: ${session.user.discord.id}`
+                );
+                await db
+                  .ref(`users/${session.user.discord.id}/authorized`)
+                  .set(true);
+                session.user.authorized = true;
+              }
             }
           }
         } catch (error) {
@@ -99,9 +125,25 @@ const handler = NextAuth({
 
       return session;
     },
-    async signIn({ user }) {
-      // You can add additional validation here if needed
-      return true;
+    async signIn({ user, account, profile }) {
+      if (!profile || !profile.id) {
+        return false;
+      }
+
+      try {
+        // Check if user is authorized in Firebase
+        const db = getAdminDb();
+        const snapshot = await db
+          .ref(`users/${profile.id}/authorized`)
+          .once("value");
+        const isAuthorized = snapshot.val() === true;
+
+        // Allow sign in for all users, but tools will be restricted based on authorization
+        return true;
+      } catch (error) {
+        console.error("Error checking authorization:", error);
+        return true; // Allow sign in but tools will be restricted
+      }
     },
   },
   pages: {

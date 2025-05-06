@@ -5,61 +5,167 @@ import {
   getStatusRotater,
   stopStatusRotater,
 } from "@/lib/services/discordStatusService";
+import { getAdminDb } from "@/lib/firebase/firebase-admin";
 
 // In-memory storage for active processes
 // A more robust implementation would use a database
 const activeProcesses = new Map();
 
+// Helper function to check if user is authorized
+async function isUserAuthorized(userId) {
+  try {
+    const db = getAdminDb();
+    console.log(`Checking authorization for userId: ${userId}`);
+
+    if (!userId) {
+      console.error("Cannot check authorization for empty userId");
+      return false;
+    }
+
+    const snapshot = await db.ref(`users/${userId}/authorized`).once("value");
+    console.log(`Authorization value from Firebase:`, snapshot.val());
+
+    // Handle different possible true values (true, "true", 1) more flexibly
+    const authValue = snapshot.val();
+    return authValue === true || authValue === "true" || authValue === 1;
+  } catch (error) {
+    console.error("Error checking user authorization:", error);
+    return false;
+  }
+}
+
 export async function GET(request) {
   try {
-    // Check authentication
     const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get processId from query params
-    const { searchParams } = new URL(request.url);
-    const processId = searchParams.get("processId");
-
-    if (!processId) {
+    console.log("SESSION:", session);
+    if (!session || !session.user) {
       return NextResponse.json(
-        { error: "Process ID is required" },
-        { status: 400 }
+        { error: "Unauthorized - No session" },
+        { status: 401 }
       );
     }
 
-    // Get process information
-    const process = activeProcesses.get(processId);
+    // Enhanced user ID extraction with multiple fallback strategies
+    let userId = null;
 
-    if (!process) {
+    // First check for discord.id in the standard location
+    if (session.user.discord?.id) {
+      userId = session.user.discord.id;
+      console.log(`Using standard discord.id: ${userId}`);
+    }
+    // Then check if there's a regular id property
+    else if (session.user.id) {
+      userId = session.user.id;
+      console.log(`Using session.user.id: ${userId}`);
+    }
+    // Try to extract from the image URL if it's a Discord CDN URL
+    else if (
+      session.user.image &&
+      session.user.image.includes("cdn.discordapp.com/avatars/")
+    ) {
+      // Extract ID from URL format: https://cdn.discordapp.com/avatars/{USER_ID}/{AVATAR_HASH}.png
+      const matches = session.user.image.match(/\/avatars\/(\d+)\//);
+      if (matches && matches[1]) {
+        userId = matches[1];
+        console.log(`Extracted Discord ID from avatar URL: ${userId}`);
+      }
+    }
+
+    // If we still don't have an ID, try to match the name with records in Firebase
+    if (!userId && session.user.name) {
+      try {
+        const db = getAdminDb();
+        const usersSnapshot = await db.ref("users").once("value");
+        const users = usersSnapshot.val();
+
+        if (users) {
+          // Find user with matching username
+          const matchingUserEntry = Object.entries(users).find(
+            ([_, userData]) => userData.username === session.user.name
+          );
+
+          if (matchingUserEntry) {
+            userId = matchingUserEntry[0];
+            console.log(
+              `Found user ID ${userId} matching username ${session.user.name} in Firebase`
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Error searching for user by name:", error);
+      }
+    }
+
+    if (!userId) {
+      console.error("No user ID found in session:", session.user);
       return NextResponse.json(
-        { error: "Process not found", success: false },
-        { status: 404 }
+        { error: "Discord ID not found in session" },
+        { status: 401 }
       );
     }
 
-    // Get current status from the rotater
-    const rotater = getStatusRotater(processId);
-    const statusInfo = rotater ? rotater.getStatus() : null;
+    // Check if user is authorized
+    const authorized = await isUserAuthorized(userId);
+    if (!authorized) {
+      return NextResponse.json(
+        {
+          error:
+            "You are not authorized to use this tool. Please contact the administrator.",
+        },
+        { status: 403 }
+      );
+    }
 
-    // Return process status
-    return NextResponse.json({
-      success: true,
-      status: {
-        active: process.active,
-        startTime: process.startTime,
-        timeInterval: process.timeInterval,
-        statuses: process.statuses,
-        currentStatus: statusInfo?.currentStatus || null,
-        totalUpdates: statusInfo?.totalUpdates || 0,
-        lastUpdateTime: statusInfo?.lastUpdateTime || null,
-      },
-    });
+    try {
+      // Get processId from query params
+      const { searchParams } = new URL(request.url);
+      const processId = searchParams.get("processId");
+
+      if (!processId) {
+        return NextResponse.json(
+          { error: "Process ID is required" },
+          { status: 400 }
+        );
+      }
+
+      // Get process information
+      const process = activeProcesses.get(processId);
+
+      if (!process) {
+        return NextResponse.json(
+          { error: "Process not found", success: false },
+          { status: 404 }
+        );
+      }
+
+      // Get current status from the rotater
+      const rotater = getStatusRotater(processId);
+      const statusInfo = rotater ? rotater.getStatus() : null;
+
+      // Return process status
+      return NextResponse.json({
+        success: true,
+        status: {
+          active: process.active,
+          startTime: process.startTime,
+          timeInterval: process.timeInterval,
+          statuses: process.statuses,
+          currentStatus: statusInfo?.currentStatus || null,
+          totalUpdates: statusInfo?.totalUpdates || 0,
+          lastUpdateTime: statusInfo?.lastUpdateTime || null,
+        },
+      });
+    } catch (error) {
+      console.error("Error getting Auto Status Updater status:", error);
+      return NextResponse.json(
+        { error: "Internal server error", success: false },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error("Error getting Auto Status Updater status:", error);
+    console.error("Error in GET auto-status-updater:", error);
     return NextResponse.json(
-      { error: "Internal server error", success: false },
+      { error: "Server error", success: false },
       { status: 500 }
     );
   }
@@ -67,10 +173,84 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    // Check authentication
     const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    console.log("SESSION:", session);
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { error: "Unauthorized - No session" },
+        { status: 401 }
+      );
+    }
+
+    // Enhanced user ID extraction with multiple fallback strategies
+    let userId = null;
+
+    // First check for discord.id in the standard location
+    if (session.user.discord?.id) {
+      userId = session.user.discord.id;
+      console.log(`Using standard discord.id: ${userId}`);
+    }
+    // Then check if there's a regular id property
+    else if (session.user.id) {
+      userId = session.user.id;
+      console.log(`Using session.user.id: ${userId}`);
+    }
+    // Try to extract from the image URL if it's a Discord CDN URL
+    else if (
+      session.user.image &&
+      session.user.image.includes("cdn.discordapp.com/avatars/")
+    ) {
+      // Extract ID from URL format: https://cdn.discordapp.com/avatars/{USER_ID}/{AVATAR_HASH}.png
+      const matches = session.user.image.match(/\/avatars\/(\d+)\//);
+      if (matches && matches[1]) {
+        userId = matches[1];
+        console.log(`Extracted Discord ID from avatar URL: ${userId}`);
+      }
+    }
+
+    // If we still don't have an ID, try to match the name with records in Firebase
+    if (!userId && session.user.name) {
+      try {
+        const db = getAdminDb();
+        const usersSnapshot = await db.ref("users").once("value");
+        const users = usersSnapshot.val();
+
+        if (users) {
+          // Find user with matching username
+          const matchingUserEntry = Object.entries(users).find(
+            ([_, userData]) => userData.username === session.user.name
+          );
+
+          if (matchingUserEntry) {
+            userId = matchingUserEntry[0];
+            console.log(
+              `Found user ID ${userId} matching username ${session.user.name} in Firebase`
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Error searching for user by name:", error);
+      }
+    }
+
+    if (!userId) {
+      console.error("No user ID found in session:", session.user);
+      return NextResponse.json(
+        { error: "Discord ID not found in session" },
+        { status: 401 }
+      );
+    }
+
+    // Check if user is authorized
+    const authorized = await isUserAuthorized(userId);
+    if (!authorized) {
+      return NextResponse.json(
+        {
+          error:
+            "You are not authorized to use this tool. Please contact the administrator.",
+        },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
@@ -86,7 +266,7 @@ export async function POST(request) {
     // Handle different actions
     switch (action) {
       case "start":
-        return handleStart(body, session);
+        return handleStart(body, { user: { ...session.user, id: userId } });
       case "stop":
         return handleStop(body);
       default:
@@ -133,7 +313,13 @@ async function handleStart(data, session) {
 
   try {
     // Check if user already has an active process
-    const userId = session.user?.id || "anonymous";
+    const userId = session.user?.discord?.id;
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Discord user ID not found", success: false },
+        { status: 401 }
+      );
+    }
 
     for (const process of activeProcesses.values()) {
       if (process.userId === userId && process.active) {

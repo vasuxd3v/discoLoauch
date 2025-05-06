@@ -15,6 +15,8 @@ export default function AutoMessagerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [isCheckingActiveProcess, setIsCheckingActiveProcess] = useState(true);
+  const [isUnauthorized, setIsUnauthorized] = useState(false);
+  const [authMessage, setAuthMessage] = useState("");
   const router = useRouter();
   const { data: session, status } = useSession();
 
@@ -31,9 +33,25 @@ export default function AutoMessagerPage() {
   useEffect(() => {
     async function checkActiveProcess() {
       try {
+        setIsCheckingActiveProcess(true);
         const response = await fetch(
           "/api/tools/auto-messager?checkActive=true"
         );
+
+        if (response.status === 401 || response.status === 403) {
+          // Handle authorization issues
+          const data = await response.json();
+          console.warn("Authorization issue:", data.error);
+          setErrorMsg("");
+          setIsUnauthorized(true);
+          setAuthMessage(
+            data.error ||
+              "You're not authorized to use this tool. Please contact the administrator."
+          );
+          setIsCheckingActiveProcess(false);
+          return;
+        }
+
         if (!response.ok) {
           throw new Error("Failed to check active processes");
         }
@@ -47,6 +65,7 @@ export default function AutoMessagerPage() {
         }
       } catch (error) {
         console.error("Error checking active processes:", error);
+        setErrorMsg("Failed to connect to the server. Please try again later.");
       } finally {
         setIsCheckingActiveProcess(false);
       }
@@ -158,6 +177,115 @@ export default function AutoMessagerPage() {
           <div className="text-center">
             <div className="inline-block animate-spin h-8 w-8 border-4 border-gray-400 border-t-blue-600 rounded-full mb-4"></div>
             <p className="text-gray-300">Checking status...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show unauthorized message if user is not authorized
+  if (isUnauthorized) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white">
+        <Navbar />
+        <div className="container mx-auto px-4 pt-28 pb-16 flex items-center justify-center">
+          <div className="w-full max-w-lg">
+            <div className="bg-gray-800 rounded-xl shadow-2xl p-8 border border-gray-700 text-center">
+              {/* Lock Icon */}
+              <div className="flex justify-center mb-6">
+                <div className="bg-red-800/30 p-5 rounded-full">
+                  <svg
+                    className="w-14 h-14 text-red-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                </div>
+              </div>
+
+              <h2 className="text-2xl font-bold mb-2 text-red-400">
+                Access Restricted
+              </h2>
+              <p className="mb-4 text-gray-300">{authMessage}</p>
+
+              <div className="bg-gray-900/50 p-4 rounded-lg mb-6">
+                <h3 className="font-medium text-blue-400 mb-2">
+                  How to get access:
+                </h3>
+                <ul className="text-left text-sm text-gray-300 space-y-2">
+                  <li className="flex items-start">
+                    <svg
+                      className="w-5 h-5 mr-2 text-blue-400 mt-0.5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Contact the administrator to request access to this tool
+                  </li>
+                  <li className="flex items-start">
+                    <svg
+                      className="w-5 h-5 mr-2 text-blue-400 mt-0.5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Verify your Discord account is properly connected
+                  </li>
+                  <li className="flex items-start">
+                    <svg
+                      className="w-5 h-5 mr-2 text-blue-400 mt-0.5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Try signing out and back in
+                  </li>
+                </ul>
+              </div>
+
+              <a
+                href="/profile"
+                className="inline-flex items-center px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              >
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  ></path>
+                </svg>
+                Go to your profile
+              </a>
+            </div>
           </div>
         </div>
       </div>
