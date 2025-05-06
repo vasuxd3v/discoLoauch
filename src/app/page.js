@@ -76,18 +76,19 @@ export default function Home() {
             />
 
             <FeatureCard
-              title="Auto Replier"
-              description="Intelligent response system that handles common inquiries. Train it with your FAQs and let it handle the routine conversations."
+              title="Auto Status Updater"
+              description="Automatically cycle through custom status messages on Discord at set intervals. Keep your profile fresh and engaging with minimal effort."
               icon={
                 <svg
                   className="w-8 h-8"
                   fill="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"></path>
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-9h10v2H7z"></path>
+                  <path d="M12 7v4l3 3-1 1-3.12-3.12c-.1-.08-.19-.24-.19-.39V7h1.31z"></path>
                 </svg>
               }
-              toolPath="/tools/auto-replier"
+              toolPath="/tools/auto-status-updater"
             />
 
             <FeatureCard

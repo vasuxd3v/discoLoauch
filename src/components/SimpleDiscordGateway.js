@@ -1,41 +1,82 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
+/**
+ * A simplified Discord gateway connector specifically for DM auto-replies
+ */
 export default function useSimpleDiscordGateway({
   token,
-  triggerWords,
-  servers,
-  replyContent,
+  messageContent,
   cooldown,
+  blacklist = [],
+  replyToAllDms = true,
   onMessageSent,
   onError,
   enabled,
 }) {
   const [connected, setConnected] = useState(false);
-  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [repliesSent, setRepliesSent] = useState(0);
   const wsRef = useRef(null);
   const heartbeatIntervalRef = useRef(null);
-  const lastReplySentRef = useRef(null);
+  const lastReplyTimestampsRef = useRef({});
+  const userIdRef = useRef(null);
 
-  // Function to send a reply message to Discord
-  const sendReply = useCallback(
+  // For debugging
+  const logDebug = useCallback((msg) => {
+    console.log(`[DM Auto Reply] ${msg}`);
+  }, []);
+
+  // Extract user ID from token
+  const getUserIdFromToken = useCallback(() => {
+    try {
+      if (!token) return null;
+
+      // Try to decode the bot token
+      const tokenParts = token.split(".");
+      if (tokenParts.length < 1) return null;
+
+      // Add padding if needed
+      let base64 = tokenParts[0];
+      while (base64.length % 4 !== 0) {
+        base64 += "=";
+      }
+
+      // Decode and return
+      return atob(base64);
+    } catch (error) {
+      logDebug(`Error extracting user ID from token: ${error.message}`);
+      return null;
+    }
+  }, [token, logDebug]);
+
+  // Send a message to Discord
+  const sendMessage = useCallback(
     async (channelId) => {
       try {
-        if (!channelId) return false;
-
         const now = Date.now();
+        const userId = channelId.split("-").pop();
+
+        // Check if user is blacklisted
+        if (blacklist.includes(userId)) {
+          logDebug(`User ${userId} is blacklisted, not sending reply`);
+          return false;
+        }
+
+        // Check cooldown for this specific user
         if (
-          lastReplySentRef.current &&
-          now - lastReplySentRef.current < cooldown * 1000
+          lastReplyTimestampsRef.current[userId] &&
+          now - lastReplyTimestampsRef.current[userId] < cooldown * 1000
         ) {
-          console.log(
-            `Cooldown active, skipping reply. ${Math.round(
-              (cooldown * 1000 - (now - lastReplySentRef.current)) / 1000
+          logDebug(
+            `Cooldown active for user ${userId}, skipping reply. ${Math.round(
+              (cooldown * 1000 -
+                (now - lastReplyTimestampsRef.current[userId])) /
+                1000
             )}s remaining.`
           );
           return false;
         }
 
-        console.log(`Sending reply to channel ${channelId}`);
+        logDebug(`Sending reply to DM channel ${channelId}`);
 
         const response = await fetch(
           `https://discord.com/api/v9/channels/${channelId}/messages`,
@@ -47,209 +88,233 @@ export default function useSimpleDiscordGateway({
               "User-Agent":
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36",
             },
-            body: JSON.stringify({ content: replyContent }),
+            body: JSON.stringify({
+              content: messageContent,
+            }),
           }
         );
 
         if (response.ok) {
-          console.log(`Reply sent successfully to channel ${channelId}`);
-          lastReplySentRef.current = now;
+          logDebug(`Successfully sent reply to DM channel ${channelId}`);
+          lastReplyTimestampsRef.current[userId] = now;
+          setRepliesSent((prev) => prev + 1);
           if (onMessageSent) onMessageSent();
           return true;
         }
 
         const errorData = await response.json().catch(() => ({}));
-        console.error("Discord API error:", response.status, errorData);
-        if (onError) onError(`Failed to send message: ${response.status}`);
+
+        if (response.status === 429) {
+          logDebug(`Rate limited: ${JSON.stringify(errorData)}`);
+          if (onError) onError(`Rate limited. Try again later.`);
+          return false;
+        }
+
+        logDebug(
+          `Failed to send message: ${response.status}, ${JSON.stringify(
+            errorData
+          )}`
+        );
+        if (onError)
+          onError(
+            `Discord API error: ${response.status} ${JSON.stringify(errorData)}`
+          );
         return false;
       } catch (error) {
-        console.error("Error sending reply:", error);
+        logDebug(`Error sending DM reply: ${error.message}`);
         if (onError) onError(error.message || "Failed to send reply");
         return false;
       }
     },
-    [token, replyContent, cooldown, onMessageSent, onError]
+    [
+      token,
+      messageContent,
+      cooldown,
+      blacklist,
+      onMessageSent,
+      onError,
+      logDebug,
+    ]
   );
 
-  // Get user ID from token (to filter own messages)
-  const getUserIdFromToken = useCallback(() => {
-    try {
-      if (!token) return null;
-
-      const base64 = token.split(".")[0];
-      return atob(base64);
-    } catch (error) {
-      console.error("Error decoding user ID from token:", error);
-      return null;
+  // Send heartbeat to keep the connection alive
+  const sendHeartbeat = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return;
     }
-  }, [token]);
+
+    wsRef.current.send(
+      JSON.stringify({
+        op: 1, // Heartbeat opcode
+        d: null,
+      })
+    );
+  }, []);
 
   // Handle incoming messages
-  const handleMessageCreate = useCallback(
-    (message) => {
-      // Skip own messages
-      const myUserId = getUserIdFromToken();
-      if (myUserId && message.author && message.author.id === myUserId) {
-        return;
-      }
+  const handleMessage = useCallback(
+    (event) => {
+      try {
+        const data = JSON.parse(event.data);
 
-      // Check if message is from a monitored server
-      if (
-        servers.length > 0 &&
-        message.guild_id &&
-        !servers.includes(message.guild_id)
-      ) {
-        return;
-      }
+        switch (data.op) {
+          case 10: // Hello
+            // Start heartbeat
+            const heartbeatInterval = data.d.heartbeat_interval;
+            clearInterval(heartbeatIntervalRef.current);
+            heartbeatIntervalRef.current = setInterval(
+              sendHeartbeat,
+              heartbeatInterval
+            );
 
-      // Check if message contains any trigger words
-      if (!message.content) return;
+            // Send identify
+            wsRef.current.send(
+              JSON.stringify({
+                op: 2, // Identify
+                d: {
+                  token: token,
+                  properties: {
+                    $os: "windows",
+                    $browser: "chrome",
+                    $device: "chrome",
+                  },
+                  // Use DM and Guild intents
+                  intents: (1 << 0) | (1 << 9) | (1 << 12) | (1 << 15),
+                },
+              })
+            );
+            break;
 
-      const content = message.content.toLowerCase();
-      const matchedTrigger = triggerWords.find((word) =>
-        content.includes(word.toLowerCase())
-      );
-
-      if (matchedTrigger) {
-        console.log(`Trigger word "${matchedTrigger}" detected in message`);
-        sendReply(message.channel_id);
+          case 0: // Dispatch
+            // Handle READY event to get user ID
+            if (data.t === "READY") {
+              logDebug("Connected to Discord Gateway");
+              userIdRef.current = data.d.user.id;
+              setConnected(true);
+            }
+            // Handle direct messages
+            else if (data.t === "MESSAGE_CREATE") {
+              handleDirectMessage(data.d);
+            }
+            break;
+        }
+      } catch (error) {
+        logDebug(`Error handling WebSocket message: ${error.message}`);
       }
     },
-    [servers, triggerWords, sendReply, getUserIdFromToken]
+    [token, sendHeartbeat, logDebug]
   );
 
-  // Connect to Discord Gateway
+  // Handle direct messages
+  const handleDirectMessage = useCallback(
+    (message) => {
+      // Check if this is a DM
+      const isDM = message.guild_id === null && !message.webhook_id;
+
+      // Skip our own messages
+      if (message.author.id === userIdRef.current) {
+        return;
+      }
+
+      if (isDM) {
+        logDebug(
+          `Received DM from ${message.author.username} (${message.author.id})`
+        );
+
+        // If replyToAllDms is false, check if this is a new DM (no previous messages)
+        if (!replyToAllDms) {
+          // This is a simplification - in reality we'd need to check message history
+          // But for this implementation we'll use the lastReplyTimestampsRef as a proxy
+          if (lastReplyTimestampsRef.current[message.author.id]) {
+            logDebug(
+              `Not replying to existing conversation with ${message.author.id}`
+            );
+            return;
+          }
+        }
+
+        // Send reply to this DM
+        sendMessage(message.channel_id);
+      }
+    },
+    [sendMessage, replyToAllDms, logDebug]
+  );
+
+  // Connect to Discord gateway
   const connect = useCallback(() => {
-    if (!enabled || !token) return;
+    if (!enabled || !token) {
+      return;
+    }
 
     try {
       // Close existing connection if it exists
       if (wsRef.current) {
-        wsRef.current.close();
+        wsRef.current.close(1000, "Reconnecting");
       }
 
-      console.log("Connecting to Discord Gateway...");
+      logDebug("Connecting to Discord Gateway");
       wsRef.current = new WebSocket(
         "wss://gateway.discord.gg/?v=9&encoding=json"
       );
 
+      // Set up event handlers
       wsRef.current.onopen = () => {
-        console.log("WebSocket connection opened");
-        setConnected(true);
-
-        // Send identify payload immediately on open
-        wsRef.current.send(
-          JSON.stringify({
-            op: 2, // Identify
-            d: {
-              token: token,
-              properties: {
-                $os: "windows",
-                $browser: "chrome",
-                $device: "chrome",
-              },
-              intents: (1 << 9) | (1 << 0) | (1 << 15), // GUILD_MESSAGES, GUILDS, MESSAGE_CONTENT
-            },
-          })
-        );
+        logDebug("WebSocket connection established");
       };
 
-      wsRef.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-
-          // Handle heartbeat
-          if (data.op === 10) {
-            // Hello
-            const interval = data.d.heartbeat_interval;
-            console.log(
-              `Received Hello with heartbeat interval: ${interval}ms`
-            );
-
-            // Clear any existing heartbeat interval
-            if (heartbeatIntervalRef.current) {
-              clearInterval(heartbeatIntervalRef.current);
-            }
-
-            // Setup heartbeat interval
-            heartbeatIntervalRef.current = setInterval(() => {
-              if (wsRef.current?.readyState === WebSocket.OPEN) {
-                console.log("Sending heartbeat");
-                wsRef.current.send(
-                  JSON.stringify({
-                    op: 1, // Heartbeat
-                    d: null,
-                  })
-                );
-              }
-            }, interval);
-          }
-
-          // Handle heartbeat ACK
-          if (data.op === 11) {
-            console.log("Heartbeat acknowledged");
-          }
-
-          // Handle messages
-          if (data.op === 0 && data.t === "MESSAGE_CREATE") {
-            console.log("Received message");
-            handleMessageCreate(data.d);
-          }
-        } catch (error) {
-          console.error("Error handling WebSocket message:", error);
-        }
-      };
+      wsRef.current.onmessage = handleMessage;
 
       wsRef.current.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        if (onError) onError("Connection error");
+        logDebug(`WebSocket error: ${error}`);
+        if (onError) onError("Connection error with Discord");
       };
 
       wsRef.current.onclose = (event) => {
-        console.log(`WebSocket closed: ${event.code}`);
+        logDebug(
+          `WebSocket closed: Code ${event.code} - ${
+            event.reason || "No reason"
+          }`
+        );
         setConnected(false);
+        clearInterval(heartbeatIntervalRef.current);
 
-        // Clear heartbeat interval
-        if (heartbeatIntervalRef.current) {
-          clearInterval(heartbeatIntervalRef.current);
+        // Handle authentication errors
+        if (event.code === 4004) {
+          logDebug("Authentication failed - invalid token");
+          if (onError)
+            onError("Discord authentication failed. Your token is invalid.");
+          return;
         }
 
-        // Try to reconnect if still enabled
-        if (enabled && reconnectAttempts < 5) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-          console.log(
-            `Reconnecting in ${delay / 1000}s (attempt ${
-              reconnectAttempts + 1
-            }/5)`
-          );
-
+        // Attempt to reconnect after a delay if still enabled
+        if (enabled) {
           setTimeout(() => {
-            setReconnectAttempts((prev) => prev + 1);
             connect();
-          }, delay);
+          }, 5000);
         }
       };
     } catch (error) {
-      console.error("Error creating WebSocket:", error);
-      if (onError) onError("Failed to connect");
+      logDebug(`Error creating WebSocket: ${error.message}`);
+      if (onError) onError(`Failed to connect: ${error.message}`);
     }
-  }, [enabled, token, handleMessageCreate, onError, reconnectAttempts]);
+  }, [enabled, token, handleMessage, onError, logDebug]);
 
-  // Disconnect from Discord Gateway
+  // Disconnect from Discord gateway
   const disconnect = useCallback(() => {
     if (heartbeatIntervalRef.current) {
       clearInterval(heartbeatIntervalRef.current);
     }
 
     if (wsRef.current) {
-      wsRef.current.close();
+      logDebug("Closing WebSocket connection");
+      wsRef.current.close(1000, "Disconnecting");
       wsRef.current = null;
     }
 
     setConnected(false);
-  }, []);
+  }, [logDebug]);
 
-  // Connect on component mount, disconnect on unmount
+  // Connect/disconnect based on enabled state
   useEffect(() => {
     if (enabled && token) {
       connect();
@@ -262,5 +327,8 @@ export default function useSimpleDiscordGateway({
     };
   }, [enabled, token, connect, disconnect]);
 
-  return { connected, reconnectAttempts };
+  return {
+    connected,
+    repliesSent,
+  };
 }

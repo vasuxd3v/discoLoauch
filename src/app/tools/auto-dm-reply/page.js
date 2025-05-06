@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import InputField from "@/components/InputField";
 
@@ -11,26 +12,91 @@ export default function AutoDmReplyPage() {
   const [blacklist, setBlacklist] = useState("");
   const [replyToAllDms, setReplyToAllDms] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [isCheckingActiveProcess, setIsCheckingActiveProcess] = useState(true);
+  const router = useRouter();
+
+  // Check if there's an active process when the component mounts
+  useEffect(() => {
+    const checkActiveProcess = async () => {
+      try {
+        // Use the updated API endpoint that checks Firebase
+        const response = await fetch("/api/tools/auto-dm-reply");
+        const data = await response.json();
+
+        if (data.success && data.processId) {
+          // If there's an active process in Firebase or memory, redirect to its status page
+          router.push(
+            `/tools/auto-dm-reply/status?processId=${data.processId}`
+          );
+        }
+      } catch (err) {
+        console.error("Error checking active process:", err);
+      } finally {
+        setIsCheckingActiveProcess(false);
+      }
+    };
+
+    checkActiveProcess();
+  }, [router]);
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setError("");
 
-    // Simulate API call
-    setTimeout(() => {
-      console.log({
-        discordToken,
-        messageContent,
-        cooldown,
-        blacklist: blacklist ? blacklist.split(",").map((id) => id.trim()) : [],
-        replyToAllDms,
+    try {
+      const response = await fetch("/api/tools/auto-dm-reply", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "start",
+          discordToken,
+          messageContent,
+          cooldown: parseInt(cooldown) || 60,
+          blacklist: blacklist
+            ? blacklist.split(",").map((id) => id.trim())
+            : [],
+          replyToAllDms,
+        }),
       });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to start Auto DM Reply");
+      }
+
+      if (data.success && data.processId) {
+        // Redirect to status page with the process ID
+        router.push(`/tools/auto-dm-reply/status?processId=${data.processId}`);
+      } else {
+        throw new Error("Invalid response from server");
+      }
+    } catch (err) {
+      console.error("Error starting Auto DM Reply:", err);
+      setError(err.message || "An unknown error occurred");
       setIsLoading(false);
-      // Here you would normally send the data to your backend
-      alert("Auto DM Reply started successfully!");
-    }, 1500);
+    }
   };
+
+  // Show loading state while checking for active processes
+  if (isCheckingActiveProcess) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white">
+        <Navbar />
+        <div className="container mx-auto px-4 pt-28 pb-16 flex items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block animate-spin h-8 w-8 border-4 border-gray-400 border-t-purple-600 rounded-full mb-4"></div>
+            <p className="text-gray-300">Checking status...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -46,6 +112,25 @@ export default function AutoDmReplyPage() {
             </div>
             <h1 className="text-2xl font-bold">Auto DM Reply</h1>
           </div>
+
+          {error && (
+            <div className="bg-red-900/50 border border-red-500 rounded-lg p-4 mb-6 text-red-200">
+              <div className="flex items-center">
+                <svg
+                  className="w-5 h-5 mr-2 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span>{error}</span>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Discord Token Input */}

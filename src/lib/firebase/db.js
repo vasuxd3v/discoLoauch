@@ -100,3 +100,85 @@ export const subscribeToUserData = (userId, callback) => {
   // Return function to unsubscribe
   return () => off(userRef);
 };
+
+/**
+ * Save a tool process to Firebase
+ * @param {string} userId - User ID
+ * @param {string} toolType - Type of tool (auto-dm-reply, auto-messager, etc.)
+ * @param {string} processId - Process ID
+ * @param {Object} processData - Process data
+ */
+export const saveToolProcess = async (
+  userId,
+  toolType,
+  processId,
+  processData
+) => {
+  try {
+    const processRef = ref(database, `toolProcesses/${userId}/${toolType}`);
+    await set(processRef, {
+      processId,
+      ...processData,
+      lastUpdated: new Date().toISOString(),
+    });
+    return true;
+  } catch (error) {
+    console.error(`Error saving ${toolType} process:`, error);
+    return false;
+  }
+};
+
+/**
+ * Get active tool process for a user
+ * @param {string} userId - User ID
+ * @param {string} toolType - Type of tool (auto-dm-reply, auto-messager, etc.)
+ */
+export const getUserToolProcess = async (userId, toolType) => {
+  try {
+    const processRef = ref(database, `toolProcesses/${userId}/${toolType}`);
+    const snapshot = await get(processRef);
+    if (snapshot.exists()) {
+      return snapshot.val();
+    }
+    return null;
+  } catch (error) {
+    console.error(`Error getting ${toolType} process:`, error);
+    return null;
+  }
+};
+
+/**
+ * Update tool process stats (like messages sent)
+ * @param {string} userId - User ID
+ * @param {string} toolType - Type of tool
+ * @param {Object} stats - Stats to update
+ */
+export const updateToolProcessStats = async (userId, toolType, stats) => {
+  try {
+    const processRef = ref(database, `toolProcesses/${userId}/${toolType}`);
+    await update(processRef, {
+      ...stats,
+      lastUpdated: new Date().toISOString(),
+    });
+    return true;
+  } catch (error) {
+    console.error(`Error updating ${toolType} stats:`, error);
+    return false;
+  }
+};
+
+/**
+ * Delete a tool process from Firebase
+ * @param {string} userId - User ID
+ * @param {string} toolType - Type of tool
+ */
+export const removeToolProcess = async (userId, toolType) => {
+  try {
+    const processRef = ref(database, `toolProcesses/${userId}/${toolType}`);
+    await remove(processRef);
+    return true;
+  } catch (error) {
+    console.error(`Error removing ${toolType} process:`, error);
+    return false;
+  }
+};
