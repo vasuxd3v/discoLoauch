@@ -27,22 +27,7 @@ export default function AutoStatusUpdaterPage() {
         )}`
       );
     }
-
-    // Debug logging to verify session data
-    if (status === "authenticated" && session) {
-      console.log("Session data:", JSON.stringify(session));
-      if (session.user?.image) {
-        console.log("Avatar URL:", session.user.image);
-        // Try to extract Discord ID from avatar URL
-        const matches = session.user.image.match(/\/avatars\/(\d+)\//);
-        if (matches && matches[1]) {
-          console.log("Extracted Discord ID:", matches[1]);
-        } else {
-          console.log("Failed to extract Discord ID from avatar URL");
-        }
-      }
-    }
-  }, [status, router, session]);
+  }, [status, router]);
 
   // Check if there's an active process when the component mounts
   useEffect(() => {
@@ -56,7 +41,6 @@ export default function AutoStatusUpdaterPage() {
         // Check for authorization errors
         if (response.status === 401 || response.status === 403) {
           const data = await response.json();
-          console.warn("Authorization issue:", data.error);
           setError("");
           setIsUnauthorized(true);
           setAuthMessage(
@@ -80,7 +64,6 @@ export default function AutoStatusUpdaterPage() {
           return;
         }
       } catch (err) {
-        console.error("Error checking active process:", err);
         setError("Failed to connect to the server. Please try again later.");
       } finally {
         setIsCheckingActiveProcess(false);
@@ -120,16 +103,6 @@ export default function AutoStatusUpdaterPage() {
     e.preventDefault();
     setIsLoading(true);
     setError("");
-
-    // Debug session info
-    if (session?.user) {
-      console.log(
-        "Submitting with session user:",
-        JSON.stringify(session.user)
-      );
-    } else {
-      console.log("No session user found");
-    }
 
     // Validate inputs
     if (!discordToken) {
@@ -177,7 +150,6 @@ export default function AutoStatusUpdaterPage() {
       // Handle unauthorized errors separately
       if (response.status === 401 || response.status === 403) {
         const data = await response.json();
-        console.error("Authorization error:", data);
         setError(data.error || "Authorization failed. Please sign in again.");
         setIsLoading(false);
         return;
@@ -198,7 +170,6 @@ export default function AutoStatusUpdaterPage() {
         throw new Error("Invalid response from server");
       }
     } catch (err) {
-      console.error("Error starting Auto Status Updater:", err);
       setError(err.message || "An unknown error occurred");
       setIsLoading(false);
     }

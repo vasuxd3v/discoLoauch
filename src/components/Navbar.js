@@ -47,6 +47,12 @@ export default function Navbar() {
             Tools
           </Link>
           <Link
+            href="/monitoring"
+            className="font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          >
+            Monitoring
+          </Link>
+          <Link
             href="/about"
             className="font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
           >
@@ -375,6 +381,12 @@ export default function Navbar() {
               className="font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-2"
             >
               Tools
+            </Link>
+            <Link
+              href="/monitoring"
+              className="font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-2"
+            >
+              Monitoring
             </Link>
             <Link
               href="/about"

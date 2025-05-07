@@ -1,9 +1,9 @@
 {
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/tools/auto-dm-reply/route": "app/api/tools/auto-dm-reply/route.js",
   "/api/tools/auto-status-updater/active-process/route": "app/api/tools/auto-status-updater/active-process/route.js",
-  "/api/tools/auto-status-updater/route": "app/api/tools/auto-status-updater/route.js",
   "/favicon.ico/route": "app/favicon.ico/route.js",
   "/page": "app/page.js",
-  "/tools/auto-status-updater/page": "app/tools/auto-status-updater/page.js",
-  "/tools/auto-status-updater/status/page": "app/tools/auto-status-updater/status/page.js"
+  "/tools/auto-dm-reply/page": "app/tools/auto-dm-reply/page.js",
+  "/tools/auto-status-updater/page": "app/tools/auto-status-updater/page.js"
 }

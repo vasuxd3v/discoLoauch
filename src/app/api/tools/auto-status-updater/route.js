@@ -6,30 +6,35 @@ import {
   stopStatusRotater,
 } from "@/lib/services/discordStatusService";
 import { getAdminDb } from "@/lib/firebase/firebase-admin";
+import {
+  saveToolProcessAdmin,
+  getUserToolProcessAdmin,
+  updateToolProcessStatsAdmin,
+  removeToolProcessAdmin,
+} from "@/lib/firebase/firebase-admin";
 
 // In-memory storage for active processes
 // A more robust implementation would use a database
 const activeProcesses = new Map();
 
+// Define tool type constant
+const TOOL_TYPE = "auto-status-updater";
+
 // Helper function to check if user is authorized
 async function isUserAuthorized(userId) {
   try {
     const db = getAdminDb();
-    console.log(`Checking authorization for userId: ${userId}`);
 
     if (!userId) {
-      console.error("Cannot check authorization for empty userId");
       return false;
     }
 
     const snapshot = await db.ref(`users/${userId}/authorized`).once("value");
-    console.log(`Authorization value from Firebase:`, snapshot.val());
 
     // Handle different possible true values (true, "true", 1) more flexibly
     const authValue = snapshot.val();
     return authValue === true || authValue === "true" || authValue === 1;
   } catch (error) {
-    console.error("Error checking user authorization:", error);
     return false;
   }
 }
@@ -50,12 +55,10 @@ export async function GET(request) {
     // First check for discord.id in the standard location
     if (session.user.discord?.id) {
       userId = session.user.discord.id;
-      console.log(`Using standard discord.id: ${userId}`);
     }
     // Then check if there's a regular id property
     else if (session.user.id) {
       userId = session.user.id;
-      console.log(`Using session.user.id: ${userId}`);
     }
     // Try to extract from the image URL if it's a Discord CDN URL
     else if (
@@ -66,7 +69,6 @@ export async function GET(request) {
       const matches = session.user.image.match(/\/avatars\/(\d+)\//);
       if (matches && matches[1]) {
         userId = matches[1];
-        console.log(`Extracted Discord ID from avatar URL: ${userId}`);
       }
     }
 
@@ -85,18 +87,12 @@ export async function GET(request) {
 
           if (matchingUserEntry) {
             userId = matchingUserEntry[0];
-            console.log(
-              `Found user ID ${userId} matching username ${session.user.name} in Firebase`
-            );
           }
         }
-      } catch (error) {
-        console.error("Error searching for user by name:", error);
-      }
+      } catch (error) {}
     }
 
     if (!userId) {
-      console.error("No user ID found in session:", session.user);
       return NextResponse.json(
         { error: "Discord ID not found in session" },
         { status: 401 }
@@ -155,14 +151,12 @@ export async function GET(request) {
         },
       });
     } catch (error) {
-      console.error("Error getting Auto Status Updater status:", error);
       return NextResponse.json(
         { error: "Internal server error", success: false },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error("Error in GET auto-status-updater:", error);
     return NextResponse.json(
       { error: "Server error", success: false },
       { status: 500 }
@@ -173,7 +167,6 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const session = await getServerSession();
-    console.log("SESSION:", JSON.stringify(session));
 
     // Read request body
     const body = await request.json();
@@ -191,17 +184,14 @@ export async function POST(request) {
     // First check for discord.id in the standard location
     if (session.user.discord?.id) {
       userId = session.user.discord.id;
-      console.log(`Using standard discord.id: ${userId}`);
     }
     // Then check if there's a regular id property
     else if (session.user.id) {
       userId = session.user.id;
-      console.log(`Using session.user.id: ${userId}`);
     }
     // Check if userId was passed in the request body
     else if (body.userId) {
       userId = body.userId;
-      console.log(`Using userId from request body: ${userId}`);
     }
     // Try to extract from the image URL if it's a Discord CDN URL
     else if (
@@ -212,15 +202,9 @@ export async function POST(request) {
       const matches = session.user.image.match(/\/avatars\/(\d+)\//);
       if (matches && matches[1]) {
         userId = matches[1];
-        console.log(`Extracted Discord ID from avatar URL: ${userId}`);
       } else {
-        console.error(
-          "Failed to extract Discord ID from URL:",
-          session.user.image
-        );
       }
     } else {
-      console.log("No Discord avatar URL found in session:", session.user);
     }
 
     // If we still don't have an ID, try to match the name with records in Firebase
@@ -238,25 +222,14 @@ export async function POST(request) {
 
           if (matchingUserEntry) {
             userId = matchingUserEntry[0];
-            console.log(
-              `Found user ID ${userId} matching username ${session.user.name} in Firebase`
-            );
           } else {
-            console.log(`No matching username found for ${session.user.name}`);
           }
         } else {
-          console.log("No users found in Firebase database");
         }
-      } catch (error) {
-        console.error("Error searching for user by name:", error);
-      }
+      } catch (error) {}
     }
 
     if (!userId) {
-      console.error(
-        "No user ID found in session:",
-        JSON.stringify(session.user)
-      );
       return NextResponse.json(
         { error: "Discord ID not found in session", success: false },
         { status: 401 }
@@ -297,7 +270,6 @@ export async function POST(request) {
         );
     }
   } catch (error) {
-    console.error("Error in POST auto-status-updater:", error);
     return NextResponse.json(
       { error: "Server error", success: false },
       { status: 500 }
@@ -335,19 +307,28 @@ async function handleStart(data, session) {
   try {
     // Get user ID with multiple fallbacks
     const userId = session.user?.id || session.user?.discord?.id || data.userId;
-    console.log("handleStart using userId:", userId);
 
     if (!userId) {
-      console.error(
-        "User ID not found in handleStart:",
-        JSON.stringify(session.user)
-      );
       return NextResponse.json(
         { error: "Discord user ID not found", success: false },
         { status: 401 }
       );
     }
 
+    // Check Firebase first for existing active process
+    const storedProcess = await getUserToolProcessAdmin(userId, TOOL_TYPE);
+    if (storedProcess && storedProcess.active) {
+      return NextResponse.json(
+        {
+          error: "You already have an active Auto Status Updater process",
+          success: false,
+          processId: storedProcess.processId,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Also check memory for any active processes for this user
     for (const process of activeProcesses.values()) {
       if (process.userId === userId && process.active) {
         return NextResponse.json(
@@ -383,13 +364,23 @@ async function handleStart(data, session) {
     // Store in memory
     activeProcesses.set(processId, process);
 
+    // Store in Firebase (removing sensitive data like token)
+    const processForStorage = {
+      active: true,
+      startTime: process.startTime,
+      statuses,
+      timeInterval: parseInt(timeInterval),
+      processId,
+    };
+
+    await saveToolProcessAdmin(userId, TOOL_TYPE, processId, processForStorage);
+
     // Send success response
     return NextResponse.json({
       success: true,
       processId,
     });
   } catch (error) {
-    console.error("Error starting Auto Status Updater:", error);
     return NextResponse.json(
       { error: "Failed to start Auto Status Updater", success: false },
       { status: 500 }
@@ -413,6 +404,29 @@ async function handleStop(data) {
   const process = activeProcesses.get(processId);
 
   if (!process) {
+    // Check if process exists in Firebase
+    const storedProcess = await getUserToolProcessAdmin(
+      process.userId,
+      TOOL_TYPE
+    );
+    if (storedProcess && storedProcess.processId === processId) {
+      // Update Firebase to mark process as inactive
+      await updateToolProcessStatsAdmin(process.userId, TOOL_TYPE, {
+        active: false,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: "Process stopped in database",
+        status: {
+          active: false,
+          startTime: storedProcess.startTime,
+          statuses: storedProcess.statuses,
+          timeInterval: storedProcess.timeInterval,
+        },
+      });
+    }
+
     return NextResponse.json(
       { error: "Process not found", success: false },
       { status: 404 }
@@ -427,6 +441,11 @@ async function handleStop(data) {
     process.active = false;
     activeProcesses.set(processId, process);
 
+    // Update Firebase
+    await updateToolProcessStatsAdmin(process.userId, TOOL_TYPE, {
+      active: false,
+    });
+
     // Send success response
     return NextResponse.json({
       success: true,
@@ -438,7 +457,6 @@ async function handleStop(data) {
       },
     });
   } catch (error) {
-    console.error("Error stopping Auto Status Updater:", error);
     return NextResponse.json(
       { error: "Failed to stop Auto Status Updater", success: false },
       { status: 500 }

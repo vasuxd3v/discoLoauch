@@ -1,31 +1,36 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { getAdminDb } from "@/lib/firebase/firebase-admin";
+import {
+  saveToolProcessAdmin,
+  getUserToolProcessAdmin,
+  updateToolProcessStatsAdmin,
+  removeToolProcessAdmin,
+} from "@/lib/firebase/firebase-admin";
 
 // Map to store active messaging processes by user ID and process ID
 const activeProcesses = new Map();
 // Map to store interval IDs for message sending
 const messageIntervals = new Map();
 
+// Define tool type constant
+const TOOL_TYPE = "auto-messager";
+
 // Helper function to check if user is authorized
 async function isUserAuthorized(userId) {
   try {
     const db = getAdminDb();
-    console.log(`Checking authorization for userId: ${userId}`);
 
     if (!userId) {
-      console.error("Cannot check authorization for empty userId");
       return false;
     }
 
     const snapshot = await db.ref(`users/${userId}/authorized`).once("value");
-    console.log(`Authorization value from Firebase:`, snapshot.val());
 
     // Handle different possible true values (true, "true", 1) more flexibly
     const authValue = snapshot.val();
     return authValue === true || authValue === "true" || authValue === 1;
   } catch (error) {
-    console.error("Error checking user authorization:", error);
     return false;
   }
 }
@@ -130,6 +135,12 @@ function startMessagingProcess(userId, processId) {
     if (allSuccess) {
       process.messagesSent++;
 
+      // Update Firebase with new message count and active state
+      await updateToolProcessStatsAdmin(userId, TOOL_TYPE, {
+        messagesSent: process.messagesSent,
+        active: process.active,
+      });
+
       // Calculate random delay for next message
       const delayMs =
         Math.floor(
@@ -159,26 +170,25 @@ function startMessagingProcess(userId, processId) {
 export async function POST(request) {
   try {
     const session = await getServerSession();
-    console.log("POST Session:", session);
-
-    // Session validation
-    if (!session || !session.user) {
+    if (!session) {
       return NextResponse.json(
-        { error: "Unauthorized - No session" },
+        { error: "Unauthorized", success: false },
         { status: 401 }
       );
     }
 
-    // Extract user ID with multiple fallback strategies
+    // Get user ID with multiple fallback strategies
     let userId = null;
 
     // First check for discord.id in the standard location
     if (session.user.discord?.id) {
       userId = session.user.discord.id;
+      console.log(`Using standard discord.id: ${userId}`);
     }
     // Then check if there's a regular id property
     else if (session.user.id) {
       userId = session.user.id;
+      console.log(`Using session.user.id: ${userId}`);
     }
     // Try to extract from the image URL if it's a Discord CDN URL
     else if (
@@ -193,35 +203,10 @@ export async function POST(request) {
       }
     }
 
-    // If we still don't have an ID, try to match the name with records in Firebase
-    if (!userId && session.user.name) {
-      try {
-        const db = getAdminDb();
-        const usersSnapshot = await db.ref("users").once("value");
-        const users = usersSnapshot.val();
-
-        if (users) {
-          // Find user with matching username
-          const matchingUserEntry = Object.entries(users).find(
-            ([_, userData]) => userData.username === session.user.name
-          );
-
-          if (matchingUserEntry) {
-            userId = matchingUserEntry[0];
-            console.log(
-              `Found user ID ${userId} matching username ${session.user.name} in Firebase`
-            );
-          }
-        }
-      } catch (error) {
-        console.error("Error searching for user by name:", error);
-      }
-    }
-
     if (!userId) {
       console.error("No user ID found in session:", session.user);
       return NextResponse.json(
-        { error: "Discord ID not found in session" },
+        { error: "Discord ID not found in session", success: false },
         { status: 401 }
       );
     }
@@ -265,22 +250,17 @@ export async function POST(request) {
     } = await request.json();
 
     if (action === "start") {
-      // Check if user already has an active process
-      if (activeProcesses.has(userId)) {
-        const userProcesses = activeProcesses.get(userId);
-        const hasActiveProcess = Array.from(userProcesses.values()).some(
-          (process) => process.active
+      // Check if user already has an active process in Firebase
+      const storedProcess = await getUserToolProcessAdmin(userId, TOOL_TYPE);
+      if (storedProcess && storedProcess.active) {
+        return NextResponse.json(
+          {
+            error: "You already have an active auto-messager process running",
+            hasActiveProcess: true,
+            processId: storedProcess.processId,
+          },
+          { status: 400 }
         );
-
-        if (hasActiveProcess) {
-          return NextResponse.json(
-            {
-              error: "You already have an active auto-messager process running",
-              hasActiveProcess: true,
-            },
-            { status: 400 }
-          );
-        }
       }
 
       // Create a unique process ID
@@ -315,6 +295,20 @@ export async function POST(request) {
       }
       activeProcesses.get(userId).set(newProcessId, processInfo);
 
+      // Save to Firebase (without sensitive data)
+      const processForStorage = {
+        ...processInfo,
+        processId: newProcessId,
+        startTime: processInfo.startTime,
+      };
+      delete processForStorage.token; // Remove token property entirely
+      await saveToolProcessAdmin(
+        userId,
+        TOOL_TYPE,
+        newProcessId,
+        processForStorage
+      );
+
       // Start the messaging process
       startMessagingProcess(userId, newProcessId);
 
@@ -327,7 +321,7 @@ export async function POST(request) {
           token: undefined, // Don't send token back to client
         },
       });
-    } else if (action === "stop" && processId) {
+    } else if (action === "stop") {
       // Find and stop the process
       if (
         activeProcesses.has(userId) &&
@@ -343,12 +337,34 @@ export async function POST(request) {
           messageIntervals.delete(intervalKey);
         }
 
+        // Update Firebase
+        await updateToolProcessStatsAdmin(userId, TOOL_TYPE, {
+          active: false,
+          messagesSent: process.messagesSent,
+        });
+
         return NextResponse.json({
           success: true,
           message: "Auto-messager stopped",
           status: {
             ...process,
             token: undefined, // Don't send token back to client
+          },
+        });
+      }
+
+      // Check if process exists in Firebase
+      const storedProcess = await getUserToolProcessAdmin(userId, TOOL_TYPE);
+      if (storedProcess && storedProcess.processId === processId) {
+        // Update Firebase to mark process as inactive
+        await updateToolProcessStatsAdmin(userId, TOOL_TYPE, { active: false });
+
+        return NextResponse.json({
+          success: true,
+          message: "Process stopped in database",
+          status: {
+            ...storedProcess,
+            active: false,
           },
         });
       }
@@ -376,6 +392,18 @@ export async function POST(request) {
         });
       }
 
+      // Check if process exists in Firebase
+      const storedProcess = await getUserToolProcessAdmin(userId, TOOL_TYPE);
+      if (storedProcess && storedProcess.processId === processId) {
+        return NextResponse.json({
+          success: true,
+          status: {
+            ...storedProcess,
+            active: false,
+          },
+        });
+      }
+
       return NextResponse.json(
         {
           error: "Process not found",
@@ -397,25 +425,25 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     const session = await getServerSession();
-
-    // Session validation
-    if (!session || !session.user) {
+    if (!session) {
       return NextResponse.json(
-        { error: "Unauthorized - No session" },
+        { error: "Unauthorized", success: false },
         { status: 401 }
       );
     }
 
-    // Extract user ID with multiple fallback strategies
+    // Get user ID with multiple fallback strategies
     let userId = null;
 
     // First check for discord.id in the standard location
     if (session.user.discord?.id) {
       userId = session.user.discord.id;
+      console.log(`Using standard discord.id: ${userId}`);
     }
     // Then check if there's a regular id property
     else if (session.user.id) {
       userId = session.user.id;
+      console.log(`Using session.user.id: ${userId}`);
     }
     // Try to extract from the image URL if it's a Discord CDN URL
     else if (
@@ -430,40 +458,14 @@ export async function GET(request) {
       }
     }
 
-    // If we still don't have an ID, try to match the name with records in Firebase
-    if (!userId && session.user.name) {
-      try {
-        const db = getAdminDb();
-        const usersSnapshot = await db.ref("users").once("value");
-        const users = usersSnapshot.val();
-
-        if (users) {
-          // Find user with matching username
-          const matchingUserEntry = Object.entries(users).find(
-            ([_, userData]) => userData.username === session.user.name
-          );
-
-          if (matchingUserEntry) {
-            userId = matchingUserEntry[0];
-            console.log(
-              `Found user ID ${userId} matching username ${session.user.name} in Firebase`
-            );
-          }
-        }
-      } catch (error) {
-        console.error("Error searching for user by name:", error);
-      }
-    }
-
     if (!userId) {
       console.error("No user ID found in session:", session.user);
       return NextResponse.json(
-        { error: "Discord ID not found in session" },
+        { error: "Discord ID not found in session", success: false },
         { status: 401 }
       );
     }
 
-    // Rest of the function is the same...
     // Check if user is authorized - always authorize if authorized property is in session
     let authorized = false;
 
@@ -494,7 +496,6 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const processId = searchParams.get("processId");
 
-    // Rest of the function...
     if (processId) {
       // Return status of specific process
       if (
@@ -512,12 +513,35 @@ export async function GET(request) {
         });
       }
 
+      // Check if process exists in Firebase
+      const storedProcess = await getUserToolProcessAdmin(userId, TOOL_TYPE);
+      if (storedProcess && storedProcess.processId === processId) {
+        return NextResponse.json({
+          success: true,
+          status: {
+            ...storedProcess,
+            active: false,
+          },
+        });
+      }
+
       return NextResponse.json({ error: "Process not found" }, { status: 404 });
     }
 
     // Check for active processes
     const checkActive = searchParams.get("checkActive") === "true";
     if (checkActive) {
+      // First check Firebase
+      const storedProcess = await getUserToolProcessAdmin(userId, TOOL_TYPE);
+      if (storedProcess && storedProcess.active) {
+        return NextResponse.json({
+          success: true,
+          hasActiveProcess: true,
+          activeProcessId: storedProcess.processId,
+        });
+      }
+
+      // Then check memory
       if (activeProcesses.has(userId)) {
         const userProcesses = Array.from(activeProcesses.get(userId).entries());
         const activeProcess = userProcesses.find(
@@ -540,24 +564,33 @@ export async function GET(request) {
     }
 
     // Return all processes for user
-    if (activeProcesses.has(userId)) {
-      const processes = Array.from(activeProcesses.get(userId).entries()).map(
-        ([id, process]) => ({
-          processId: id,
-          ...process,
-          token: undefined, // Don't send token back to client
-        })
-      );
+    const processes = [];
 
-      return NextResponse.json({
-        success: true,
-        processes,
+    // Get processes from Firebase
+    const storedProcess = await getUserToolProcessAdmin(userId, TOOL_TYPE);
+    if (storedProcess) {
+      processes.push({
+        processId: storedProcess.processId,
+        ...storedProcess,
+        token: undefined, // Don't send token back to client
       });
+    }
+
+    // Get processes from memory
+    if (activeProcesses.has(userId)) {
+      const memoryProcesses = Array.from(
+        activeProcesses.get(userId).entries()
+      ).map(([id, process]) => ({
+        processId: id,
+        ...process,
+        token: undefined, // Don't send token back to client
+      }));
+      processes.push(...memoryProcesses);
     }
 
     return NextResponse.json({
       success: true,
-      processes: [],
+      processes,
     });
   } catch (error) {
     console.error("Error in GET auto-messager:", error);

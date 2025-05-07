@@ -26,21 +26,17 @@ const TOOL_TYPE = "auto-dm-reply";
 async function isUserAuthorized(userId) {
   try {
     const db = getAdminDb();
-    console.log(`Checking authorization for userId: ${userId}`);
 
     if (!userId) {
-      console.error("Cannot check authorization for empty userId");
       return false;
     }
 
     const snapshot = await db.ref(`users/${userId}/authorized`).once("value");
-    console.log(`Authorization value from Firebase:`, snapshot.val());
 
     // Handle different possible true values (true, "true", 1) more flexibly
     const authValue = snapshot.val();
     return authValue === true || authValue === "true" || authValue === 1;
   } catch (error) {
-    console.error("Error checking user authorization:", error);
     return false;
   }
 }
@@ -49,7 +45,6 @@ export async function GET(request) {
   try {
     // Check authentication
     const session = await getServerSession();
-    console.log("SESSION:", session);
     if (!session || !session.user) {
       return NextResponse.json(
         { error: "Unauthorized - No session" },
@@ -63,12 +58,10 @@ export async function GET(request) {
     // First check for discord.id in the standard location
     if (session.user.discord?.id) {
       userId = session.user.discord.id;
-      console.log(`Using standard discord.id: ${userId}`);
     }
     // Then check if there's a regular id property
     else if (session.user.id) {
       userId = session.user.id;
-      console.log(`Using session.user.id: ${userId}`);
     }
     // Try to extract from the image URL if it's a Discord CDN URL
     else if (
@@ -79,7 +72,6 @@ export async function GET(request) {
       const matches = session.user.image.match(/\/avatars\/(\d+)\//);
       if (matches && matches[1]) {
         userId = matches[1];
-        console.log(`Extracted Discord ID from avatar URL: ${userId}`);
       }
     }
 
@@ -98,18 +90,12 @@ export async function GET(request) {
 
           if (matchingUserEntry) {
             userId = matchingUserEntry[0];
-            console.log(
-              `Found user ID ${userId} matching username ${session.user.name} in Firebase`
-            );
           }
         }
-      } catch (error) {
-        console.error("Error searching for user by name:", error);
-      }
+      } catch (error) {}
     }
 
     if (!userId) {
-      console.error("No user ID found in session:", session.user);
       return NextResponse.json(
         { error: "Discord ID not found in session" },
         { status: 401 }
@@ -232,7 +218,6 @@ export async function GET(request) {
       },
     });
   } catch (error) {
-    console.error("Error in Auto DM Reply GET API:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -257,12 +242,10 @@ export async function POST(request) {
     // First check for discord.id in the standard location
     if (session.user.discord?.id) {
       userId = session.user.discord.id;
-      console.log(`Using standard discord.id: ${userId}`);
     }
     // Then check if there's a regular id property
     else if (session.user.id) {
       userId = session.user.id;
-      console.log(`Using session.user.id: ${userId}`);
     }
     // Try to extract from the image URL if it's a Discord CDN URL
     else if (
@@ -273,7 +256,6 @@ export async function POST(request) {
       const matches = session.user.image.match(/\/avatars\/(\d+)\//);
       if (matches && matches[1]) {
         userId = matches[1];
-        console.log(`Extracted Discord ID from avatar URL: ${userId}`);
       }
     }
 
@@ -292,18 +274,12 @@ export async function POST(request) {
 
           if (matchingUserEntry) {
             userId = matchingUserEntry[0];
-            console.log(
-              `Found user ID ${userId} matching username ${session.user.name} in Firebase`
-            );
           }
         }
-      } catch (error) {
-        console.error("Error searching for user by name:", error);
-      }
+      } catch (error) {}
     }
 
     if (!userId) {
-      console.error("No user ID found in session:", session.user);
       return NextResponse.json(
         { error: "Discord ID not found in session" },
         { status: 401 }
@@ -345,7 +321,6 @@ export async function POST(request) {
         );
     }
   } catch (error) {
-    console.error("Error in Auto DM Reply API:", error);
     return NextResponse.json(
       { error: "Internal server error", success: false },
       { status: 500 }
@@ -443,7 +418,6 @@ async function handleStart(data, session) {
       processId,
     });
   } catch (error) {
-    console.error("Error starting Auto DM Reply:", error);
     return NextResponse.json(
       { error: "Failed to start Auto DM Reply", success: false },
       { status: 500 }
@@ -518,7 +492,6 @@ async function handleStop(data, userId) {
       },
     });
   } catch (error) {
-    console.error("Error stopping Auto DM Reply:", error);
     return NextResponse.json(
       { error: "Failed to stop Auto DM Reply", success: false },
       { status: 500 }
@@ -558,8 +531,6 @@ function startDiscordGatewayConnection(processId, process) {
 
       // WebSocket event handlers
       ws.on("open", () => {
-        console.log(`[Process ${processId}] Connected to Discord Gateway`);
-
         try {
           // Send identify payload with proper intents for DMs
           ws.send(
@@ -577,12 +548,7 @@ function startDiscordGatewayConnection(processId, process) {
               },
             })
           );
-        } catch (error) {
-          console.error(
-            `[Process ${processId}] Error sending identify payload:`,
-            error
-          );
-        }
+        } catch (error) {}
       });
 
       // Handle incoming messages from Discord
@@ -609,58 +575,33 @@ function startDiscordGatewayConnection(processId, process) {
                     d: connectionData.sequence,
                   })
                 );
-                console.log(`[Process ${processId}] Heartbeat sent`);
               }
             }, heartbeatInterval);
           }
 
           // Handle heartbeat ACK
           if (data.op === 11) {
-            console.log(`[Process ${processId}] Heartbeat acknowledged`);
           }
 
           // Handle dispatch events
           if (data.op === 0) {
-            console.log(`[Process ${processId}] Received event: ${data.t}`);
-
             // Save user ID on READY event
             if (data.t === "READY") {
               connectionData.userId = data.d.user.id;
-              console.log(
-                `[Process ${processId}] Authenticated as ${data.d.user.username}`
-              );
-              console.log(
-                `[Process ${processId}] User ID: ${connectionData.userId}`
-              );
             }
 
             // Handle incoming messages (both guild and DMs)
             if (data.t === "MESSAGE_CREATE") {
-              console.log(
-                `[Process ${processId}] Raw message: ${JSON.stringify(
-                  data.d
-                ).substring(0, 100)}...`
-              );
               await handleDirectMessage(data.d);
             }
           }
-        } catch (err) {
-          console.error(
-            `[Process ${processId}] Error handling gateway message:`,
-            err
-          );
-        }
+        } catch (err) {}
       });
 
       // Handle WebSocket errors and closures
-      ws.on("error", (err) => {
-        console.error(`[Process ${processId}] WebSocket error:`, err);
-      });
+      ws.on("error", (err) => {});
 
       ws.on("close", (code, reason) => {
-        console.log(
-          `[Process ${processId}] WebSocket closed: ${code} - ${reason}`
-        );
         clearInterval(connectionData.heartbeatInterval);
 
         // Try to reconnect if process is still active
@@ -672,12 +613,7 @@ function startDiscordGatewayConnection(processId, process) {
           }, 5000); // Reconnect after 5 seconds
         }
       });
-    } catch (err) {
-      console.error(
-        `[Process ${processId}] Error connecting to Discord Gateway:`,
-        err
-      );
-    }
+    } catch (err) {}
   };
 
   // Function to handle incoming direct messages
@@ -688,19 +624,6 @@ function startDiscordGatewayConnection(processId, process) {
         return;
       }
 
-      // More detailed logging to understand message structure
-      console.log(
-        `[Process ${processId}] Message from: ${
-          message.author?.username || "unknown"
-        }`
-      );
-      console.log(
-        `[Process ${processId}] Channel type: ${message.channel_type || "N/A"}`
-      );
-      console.log(
-        `[Process ${processId}] Guild ID: ${message.guild_id || "DM"}`
-      );
-
       // FIXED: Check if this is a DM - Discord uses channel_type=1 for DMs
       // We also check with guild_id === null as a fallback
       const isDM =
@@ -709,20 +632,12 @@ function startDiscordGatewayConnection(processId, process) {
 
       // Skip our own messages
       if (message.author.id === connectionData.userId) {
-        console.log(`[Process ${processId}] Skipping own message`);
         return;
       }
 
       if (isDM) {
-        console.log(
-          `[Process ${processId}] Confirmed DM from ${message.author.username} (${message.author.id})`
-        );
-
         // Check blacklist
         if (process.blacklist.includes(message.author.id)) {
-          console.log(
-            `[Process ${processId}] User ${message.author.id} is blacklisted, skipping`
-          );
           return;
         }
 
@@ -731,9 +646,6 @@ function startDiscordGatewayConnection(processId, process) {
           !process.replyToAllDms &&
           connectionData.lastReplySentTimestamps[message.author.id]
         ) {
-          console.log(
-            `[Process ${processId}] Not replying to existing conversation with ${message.author.id}`
-          );
           return;
         }
 
@@ -742,18 +654,11 @@ function startDiscordGatewayConnection(processId, process) {
         const lastReplySent =
           connectionData.lastReplySentTimestamps[message.author.id] || 0;
         if (now - lastReplySent < process.cooldown * 1000) {
-          console.log(
-            `[Process ${processId}] Cooldown active for ${message.author.id}, skipping`
-          );
           return;
         }
 
         // Send reply message
         try {
-          console.log(
-            `[Process ${processId}] Sending reply to channel ${message.channel_id}`
-          );
-
           const response = await fetch(
             `https://discord.com/api/v9/channels/${message.channel_id}/messages`,
             {
@@ -771,14 +676,8 @@ function startDiscordGatewayConnection(processId, process) {
           );
 
           const responseData = await response.text();
-          console.log(
-            `[Process ${processId}] API response: ${response.status}, ${responseData}`
-          );
 
           if (response.ok) {
-            console.log(
-              `[Process ${processId}] Reply successfully sent to ${message.author.username}`
-            );
             connectionData.lastReplySentTimestamps[message.author.id] = now;
 
             // Update reply count
@@ -789,23 +688,10 @@ function startDiscordGatewayConnection(processId, process) {
             await updateToolProcessStatsAdmin(process.userId, TOOL_TYPE, {
               repliesSent: process.repliesSent,
             });
-          } else {
-            console.error(
-              `[Process ${processId}] Failed to send reply: ${response.status}`
-            );
-            console.error(
-              `[Process ${processId}] Response body: ${responseData}`
-            );
           }
-        } catch (err) {
-          console.error(`[Process ${processId}] Error sending reply:`, err);
-        }
-      } else {
-        console.log(`[Process ${processId}] Message not a DM, ignoring`);
+        } catch (err) {}
       }
-    } catch (err) {
-      console.error(`[Process ${processId}] Error handling message:`, err);
-    }
+    } catch (err) {}
   };
 
   // Start the connection
@@ -840,11 +726,5 @@ function stopDiscordGatewayConnection(processId) {
 
     // Remove from active connections
     gatewayConnections.delete(processId);
-    console.log(`[Process ${processId}] Discord Gateway connection stopped`);
-  } catch (err) {
-    console.error(
-      `[Process ${processId}] Error stopping Discord Gateway connection:`,
-      err
-    );
-  }
+  } catch (err) {}
 }
