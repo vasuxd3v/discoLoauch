@@ -20,33 +20,56 @@ export default function ToolsPage() {
       id: "auto-messager",
       name: "Auto Messager",
       description:
-        "Schedule and send automated messages across multiple channels.",
+        "Schedule and send automated messages across multiple channels at customizable intervals.",
       icon: (
         <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
           <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"></path>
         </svg>
       ),
+      features: [
+        "Multiple channel support",
+        "Randomized delay between messages",
+        "Real-time monitoring",
+        "Automatic retry on rate limits",
+      ],
+      bgcolor: "from-blue-500 to-indigo-600",
     },
     {
-      id: "auto-replier",
-      name: "Auto Replier",
-      description: "Intelligent response system that handles common inquiries.",
+      id: "auto-status-updater",
+      name: "Auto Status Updater",
+      description:
+        "Automatically cycle through custom status messages on Discord at set intervals.",
       icon: (
         <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"></path>
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-9h10v2H7z"></path>
+          <path d="M12 7v4l3 3-1 1-3.12-3.12c-.1-.08-.19-.24-.19-.39V7h1.31z"></path>
         </svg>
       ),
+      features: [
+        "Custom status rotation",
+        "Emoji support",
+        "Scheduled activation",
+        "Activity type selection",
+      ],
+      bgcolor: "from-purple-500 to-pink-600",
     },
     {
       id: "auto-dm-reply",
       name: "Auto DM Reply",
       description:
-        "Never miss a direct message again with automatic DM replies.",
+        "Never miss a direct message again with automatic DM replies when you're away.",
       icon: (
         <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
           <path d="M22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6zm-2 0l-8 5-8-5h16zm0 12H4V8l8 5 8-5v10z"></path>
         </svg>
       ),
+      features: [
+        "Customizable reply messages",
+        "Away mode scheduling",
+        "Message filtering options",
+        "Reply only to new conversations",
+      ],
+      bgcolor: "from-teal-500 to-emerald-600",
     },
   ];
 
@@ -97,75 +120,137 @@ export default function ToolsPage() {
       <Navbar />
 
       <div className="container mx-auto px-4 pt-24 pb-16">
-        <h1 className="text-3xl font-bold mb-8 text-center text-gray-800 dark:text-white">
-          AutoXPulse Tools
-        </h1>
+        <div className="max-w-5xl mx-auto">
+          <h1 className="text-4xl font-bold mb-3 text-center text-gray-800 dark:text-white">
+            AutoXPulse Tools
+          </h1>
+          <p className="text-lg text-gray-600 dark:text-gray-300 mb-10 text-center max-w-3xl mx-auto">
+            Powerful automation tools to enhance your Discord experience and
+            streamline your online presence.
+          </p>
 
-        {session && !isAuthorized && (
-          <div className="mb-8 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 dark:bg-yellow-800 dark:border-yellow-600 dark:text-yellow-200 rounded">
-            <div className="flex items-center">
-              <svg
-                className="w-6 h-6 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                ></path>
-              </svg>
-              <span className="font-medium">Authorization Required</span>
-            </div>
-            <p className="mt-2">
-              Your account is not authorized to use these tools. Please contact
-              the administrator or use the Discord bot{" "}
-              <code className="bg-yellow-200 dark:bg-yellow-900 px-1 py-0.5 rounded">
-                /authorize
-              </code>{" "}
-              command to gain access.
-            </p>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {tools.map((tool) => (
-            <div
-              key={tool.id}
-              className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 transition-all hover:shadow-xl hover:-translate-y-1 cursor-pointer ${
-                session && !isAuthorized ? "opacity-50" : ""
-              }`}
-              onClick={() => handleToolClick(tool)}
-            >
-              <div className="flex flex-col h-full">
-                <div className="mb-4 text-blue-600 dark:text-blue-400">
-                  {tool.icon}
-                </div>
-
-                <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-100">
-                  {tool.name}
-                </h3>
-
-                <p className="text-gray-600 dark:text-gray-300 mb-6 flex-grow">
-                  {tool.description}
-                </p>
-
-                <button
-                  className={`mt-auto w-full py-2 px-4 rounded-lg transition-all focus:ring-2 focus:ring-blue-300 focus:outline-none ${
-                    session && !isAuthorized
-                      ? "bg-gray-400 text-white cursor-not-allowed"
-                      : "bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700"
-                  }`}
-                  aria-label={`Use ${tool.name}`}
-                  disabled={session && !isAuthorized}
+          {session && !isAuthorized && (
+            <div className="mb-8 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 dark:bg-yellow-800 dark:border-yellow-600 dark:text-yellow-200 rounded">
+              <div className="flex items-center">
+                <svg
+                  className="w-6 h-6 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  {session && !isAuthorized ? "Unauthorized" : "Use Tool"}
-                </button>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  ></path>
+                </svg>
+                <span className="font-medium">Authorization Required</span>
               </div>
+              <p className="mt-2">
+                Your account is not authorized to use these tools. Please
+                contact the administrator or use the Discord bot{" "}
+                <code className="bg-yellow-200 dark:bg-yellow-900 px-1 py-0.5 rounded">
+                  /authorize
+                </code>{" "}
+                command to gain access.
+              </p>
             </div>
-          ))}
+          )}
+
+          {/* Tools Grid */}
+          <div className="space-y-12">
+            {tools.map((tool, index) => (
+              <div
+                key={tool.id}
+                className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden transition-all hover:shadow-xl ${
+                  session && !isAuthorized ? "opacity-50" : ""
+                }`}
+              >
+                <div className="flex flex-col md:flex-row">
+                  {/* Tool Info */}
+                  <div className="md:w-1/2 p-8">
+                    <div
+                      className={`inline-flex p-3 rounded-full bg-gradient-to-r ${tool.bgcolor} text-white mb-4`}
+                    >
+                      {tool.icon}
+                    </div>
+                    <h3 className="text-2xl font-bold mb-3 text-gray-800 dark:text-gray-100">
+                      {tool.name}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-300 mb-6">
+                      {tool.description}
+                    </p>
+                    <ul className="space-y-2 mb-6">
+                      {tool.features.map((feature, i) => (
+                        <li
+                          key={i}
+                          className="flex items-center text-gray-600 dark:text-gray-300"
+                        >
+                          <svg
+                            className="w-5 h-5 mr-2 text-green-500"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                              clipRule="evenodd"
+                            ></path>
+                          </svg>
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      onClick={() => handleToolClick(tool)}
+                      className={`mt-auto py-3 px-6 rounded-lg transition-all focus:ring-2 focus:ring-blue-300 focus:outline-none ${
+                        session && !isAuthorized
+                          ? "bg-gray-400 text-white cursor-not-allowed"
+                          : `bg-gradient-to-r ${tool.bgcolor} text-white hover:shadow-lg`
+                      }`}
+                      aria-label={`Use ${tool.name}`}
+                      disabled={session && !isAuthorized}
+                    >
+                      {session && !isAuthorized ? "Unauthorized" : "Use Tool"}
+                    </button>
+                  </div>
+
+                  {/* Tool Visual/Screenshot */}
+                  <div className="md:w-1/2 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 p-6 flex items-center justify-center">
+                    <div className="rounded-lg shadow-lg bg-white dark:bg-gray-900 p-4 w-full max-w-sm h-64 flex flex-col border border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center justify-between mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">
+                        <div className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                          {tool.name}
+                        </div>
+                        <div className="flex space-x-1">
+                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                      </div>
+                      <div className="flex-grow flex flex-col justify-center items-center text-center px-3">
+                        <div
+                          className={`w-14 h-14 rounded-full bg-gradient-to-r ${tool.bgcolor} flex items-center justify-center mb-3`}
+                        >
+                          <div className="transform scale-75 text-white">
+                            {tool.icon}
+                          </div>
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+                          Configure and manage your {tool.name.toLowerCase()}{" "}
+                          settings
+                        </p>
+                        <div className="w-full h-4 bg-gray-200 dark:bg-gray-700 rounded-full mb-2"></div>
+                        <div className="w-2/3 h-4 bg-gray-200 dark:bg-gray-700 rounded-full mb-2"></div>
+                        <div className="w-1/2 h-4 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

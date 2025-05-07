@@ -51,6 +51,11 @@ const handler = NextAuth({
       session.user = session.user || {};
       session.user.discord = token.discord || {};
 
+      // Add Discord ID directly to the user object as well for better compatibility
+      if (token.discord?.id) {
+        session.user.id = token.discord.id;
+      }
+
       // Fetch user's guilds (servers) when session is created
       if (token.accessToken) {
         try {

@@ -33,7 +33,7 @@ export default function AuthError() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 text-center">
         <div>
-          <Link href="/">
+          <Link href="/" legacyBehavior>
             <span className="text-3xl font-bold bg-gradient-to-r from-purple-600 via-blue-500 to-indigo-600 text-transparent bg-clip-text">
               AutoXPulse
             </span>

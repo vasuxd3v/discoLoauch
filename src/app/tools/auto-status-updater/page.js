@@ -13,8 +13,8 @@ export default function AutoStatusUpdaterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [isCheckingActiveProcess, setIsCheckingActiveProcess] = useState(true);
-  const [isUnauthorized, setIsUnauthorized] = useState(false); // Add this state variable
-  const [authMessage, setAuthMessage] = useState(""); // Add this state variable
+  const [isUnauthorized, setIsUnauthorized] = useState(false);
+  const [authMessage, setAuthMessage] = useState("");
   const router = useRouter();
   const { data: session, status } = useSession();
 
@@ -27,7 +27,22 @@ export default function AutoStatusUpdaterPage() {
         )}`
       );
     }
-  }, [status, router]);
+
+    // Debug logging to verify session data
+    if (status === "authenticated" && session) {
+      console.log("Session data:", JSON.stringify(session));
+      if (session.user?.image) {
+        console.log("Avatar URL:", session.user.image);
+        // Try to extract Discord ID from avatar URL
+        const matches = session.user.image.match(/\/avatars\/(\d+)\//);
+        if (matches && matches[1]) {
+          console.log("Extracted Discord ID:", matches[1]);
+        } else {
+          console.log("Failed to extract Discord ID from avatar URL");
+        }
+      }
+    }
+  }, [status, router, session]);
 
   // Check if there's an active process when the component mounts
   useEffect(() => {
@@ -62,6 +77,7 @@ export default function AutoStatusUpdaterPage() {
           router.push(
             `/tools/auto-status-updater/status?processId=${data.processId}`
           );
+          return;
         }
       } catch (err) {
         console.error("Error checking active process:", err);
@@ -105,6 +121,16 @@ export default function AutoStatusUpdaterPage() {
     setIsLoading(true);
     setError("");
 
+    // Debug session info
+    if (session?.user) {
+      console.log(
+        "Submitting with session user:",
+        JSON.stringify(session.user)
+      );
+    } else {
+      console.log("No session user found");
+    }
+
     // Validate inputs
     if (!discordToken) {
       setError("Discord token is required");
@@ -142,8 +168,20 @@ export default function AutoStatusUpdaterPage() {
           discordToken,
           statuses: statusContents,
           timeInterval: parseInt(timeInterval),
+          // Include user ID from session if available
+          userId: session?.user?.id || session?.user?.discord?.id,
         }),
+        credentials: "include", // Ensure cookies are sent with the request
       });
+
+      // Handle unauthorized errors separately
+      if (response.status === 401 || response.status === 403) {
+        const data = await response.json();
+        console.error("Authorization error:", data);
+        setError(data.error || "Authorization failed. Please sign in again.");
+        setIsLoading(false);
+        return;
+      }
 
       const data = await response.json();
 

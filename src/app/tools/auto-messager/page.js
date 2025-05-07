@@ -8,7 +8,7 @@ import InputField from "@/components/InputField";
 
 export default function AutoMessagerPage() {
   const [discordToken, setDiscordToken] = useState("");
-  const [channelId, setChannelId] = useState("");
+  const [channelIds, setChannelIds] = useState([{ id: "", key: "initial" }]);
   const [messageContent, setMessageContent] = useState("");
   const [minDelay, setMinDelay] = useState("");
   const [maxDelay, setMaxDelay] = useState("");
@@ -19,6 +19,32 @@ export default function AutoMessagerPage() {
   const [authMessage, setAuthMessage] = useState("");
   const router = useRouter();
   const { data: session, status } = useSession();
+
+  // Initialize keys for channelIds after component mounts to avoid hydration mismatch
+  useEffect(() => {
+    setChannelIds([{ id: "", key: Date.now().toString() }]);
+  }, []);
+
+  // Add a new channel ID field
+  const addChannelId = () => {
+    setChannelIds([...channelIds, { id: "", key: Date.now().toString() }]);
+  };
+
+  // Handle channel ID change
+  const handleChannelIdChange = (index, value) => {
+    const updatedChannelIds = [...channelIds];
+    updatedChannelIds[index].id = value;
+    setChannelIds(updatedChannelIds);
+  };
+
+  // Remove a channel ID field
+  const removeChannelId = (index) => {
+    if (channelIds.length > 1) {
+      const updatedChannelIds = [...channelIds];
+      updatedChannelIds.splice(index, 1);
+      setChannelIds(updatedChannelIds);
+    }
+  };
 
   // Redirect to sign-in page if not authenticated
   useEffect(() => {
@@ -84,17 +110,26 @@ export default function AutoMessagerPage() {
     setErrorMsg("");
 
     // Validate form
-    if (
-      !discordToken ||
-      !channelId ||
-      !messageContent ||
-      !minDelay ||
-      !maxDelay
-    ) {
+    if (!discordToken || !messageContent || !minDelay || !maxDelay) {
       setErrorMsg("All fields are required");
       setIsLoading(false);
       return;
     }
+
+    // Validate channel IDs
+    const filteredChannelIds = channelIds.filter(
+      (channel) => channel.id.trim() !== ""
+    );
+    if (filteredChannelIds.length === 0) {
+      setErrorMsg("At least one channel ID is required");
+      setIsLoading(false);
+      return;
+    }
+
+    // Extract the channel IDs from the array of objects
+    const channelIdArray = filteredChannelIds.map((channel) =>
+      channel.id.trim()
+    );
 
     // Validate delay range
     const minDelayNum = parseInt(minDelay);
@@ -125,7 +160,7 @@ export default function AutoMessagerPage() {
         body: JSON.stringify({
           action: "start",
           token: discordToken,
-          channelId: channelId,
+          channelIds: channelIdArray,
           message: messageContent,
           minDelay: minDelayNum,
           maxDelay: maxDelayNum,
@@ -324,16 +359,72 @@ export default function AutoMessagerPage() {
               required
             />
 
-            {/* Channel ID Input */}
-            <InputField
-              label="Channel ID"
-              id="channel-id"
-              placeholder="Enter Discord channel ID"
-              value={channelId}
-              onChange={(e) => setChannelId(e.target.value)}
-              required
-              helpText="The numerical ID of the Discord channel where messages will be sent."
-            />
+            {/* Channel IDs Input */}
+            <div>
+              <label className="block mb-2 text-sm font-medium text-gray-300">
+                Channel ID(s) <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-3">
+                {channelIds.map((channel, index) => (
+                  <div key={channel.key} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Enter Discord channel ID"
+                      value={channel.id}
+                      onChange={(e) =>
+                        handleChannelIdChange(index, e.target.value)
+                      }
+                      required={index === 0}
+                      className="flex-grow bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    {channelIds.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeChannelId(index)}
+                        className="bg-red-600 hover:bg-red-700 p-2 rounded-full"
+                        aria-label="Remove channel"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                    {index === channelIds.length - 1 && (
+                      <button
+                        type="button"
+                        onClick={addChannelId}
+                        className="bg-blue-600 hover:bg-blue-700 p-2 rounded-full"
+                        aria-label="Add another channel"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                The numerical ID(s) of the Discord channel(s) where messages
+                will be sent.
+              </p>
+            </div>
 
             {/* Message Content */}
             <InputField

@@ -21,7 +21,7 @@ export default function SignIn() {
       <div className="max-w-md w-full space-y-8">
         {/* Logo or Brand */}
         <div className="text-center">
-          <Link href="/">
+          <Link href="/" legacyBehavior>
             <span className="text-3xl font-bold bg-gradient-to-r from-purple-600 via-blue-500 to-indigo-600 text-transparent bg-clip-text">
               AutoXPulse
             </span>

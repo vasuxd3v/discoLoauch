@@ -92,7 +92,7 @@ function startMessagingProcess(userId, processId) {
 
   const process = activeProcesses.get(userId).get(processId);
 
-  // Function to send a message and schedule the next one
+  // Function to send a message to all channels and schedule the next one
   const sendAndScheduleNext = async () => {
     if (!process.active) {
       // Stop if the process is no longer active
@@ -101,13 +101,33 @@ function startMessagingProcess(userId, processId) {
       return;
     }
 
-    const result = await sendMessageToDiscord(
-      process.token,
-      process.channelId,
-      process.message
-    );
+    // Send messages to all channels
+    let allSuccess = true;
+    let rateLimited = false;
+    let retryAfter = 0;
+    let lastError = null;
 
-    if (result.success) {
+    // Iterate through all channel IDs
+    for (const channelId of process.channelIds) {
+      const result = await sendMessageToDiscord(
+        process.token,
+        channelId,
+        process.message
+      );
+
+      if (!result.success) {
+        allSuccess = false;
+
+        if (result.rateLimited) {
+          rateLimited = true;
+          retryAfter = Math.max(retryAfter, result.retryAfter);
+        } else {
+          lastError = result.error;
+        }
+      }
+    }
+
+    if (allSuccess) {
       process.messagesSent++;
 
       // Calculate random delay for next message
@@ -120,13 +140,13 @@ function startMessagingProcess(userId, processId) {
       // Schedule next message
       const timeoutId = setTimeout(sendAndScheduleNext, delayMs);
       messageIntervals.set(`${userId}-${processId}`, timeoutId);
-    } else if (result.rateLimited) {
+    } else if (rateLimited) {
       // If rate limited, try again after the specified delay
-      const timeoutId = setTimeout(sendAndScheduleNext, result.retryAfter);
+      const timeoutId = setTimeout(sendAndScheduleNext, retryAfter);
       messageIntervals.set(`${userId}-${processId}`, timeoutId);
     } else {
       // If there was an error, try again after a default delay
-      process.lastError = result.error;
+      process.lastError = lastError;
       const timeoutId = setTimeout(sendAndScheduleNext, 10000); // 10 seconds retry
       messageIntervals.set(`${userId}-${processId}`, timeoutId);
     }
@@ -233,8 +253,16 @@ export async function POST(request) {
       );
     }
 
-    const { action, token, channelId, message, minDelay, maxDelay, processId } =
-      await request.json();
+    const {
+      action,
+      token,
+      channelId,
+      channelIds,
+      message,
+      minDelay,
+      maxDelay,
+      processId,
+    } = await request.json();
 
     if (action === "start") {
       // Check if user already has an active process
@@ -258,10 +286,20 @@ export async function POST(request) {
       // Create a unique process ID
       const newProcessId = Date.now().toString();
 
+      // Handle both single channelId and multiple channelIds for backward compatibility
+      const targetChannelIds = channelIds || (channelId ? [channelId] : []);
+
+      if (targetChannelIds.length === 0) {
+        return NextResponse.json(
+          { error: "At least one channel ID is required" },
+          { status: 400 }
+        );
+      }
+
       // Store process information
       const processInfo = {
         token,
-        channelId,
+        channelIds: targetChannelIds,
         message,
         minDelay: parseInt(minDelay),
         maxDelay: parseInt(maxDelay),
@@ -359,7 +397,6 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     const session = await getServerSession();
-    console.log("GET Session:", session);
 
     // Session validation
     if (!session || !session.user) {

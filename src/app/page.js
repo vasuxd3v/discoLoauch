@@ -40,7 +40,7 @@ export default function Home() {
               Get Started
             </button>
             <Link
-              href="/learn-more"
+              href="/docs"
               className="bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400 font-medium py-3 px-8 rounded-lg border border-blue-200 dark:border-gray-600 transition-colors shadow-md hover:shadow-lg"
             >
               Learn More

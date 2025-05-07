@@ -244,7 +244,6 @@ export async function POST(request) {
   try {
     // Check authentication
     const session = await getServerSession();
-    console.log("SESSION:", session);
     if (!session || !session.user) {
       return NextResponse.json(
         { error: "Unauthorized - No session" },
@@ -561,22 +560,29 @@ function startDiscordGatewayConnection(processId, process) {
       ws.on("open", () => {
         console.log(`[Process ${processId}] Connected to Discord Gateway`);
 
-        // Send identify payload with proper intents for DMs
-        ws.send(
-          JSON.stringify({
-            op: 2, // Identify
-            d: {
-              token: discordToken,
-              properties: {
-                $os: "windows",
-                $browser: "chrome",
-                $device: "chrome",
+        try {
+          // Send identify payload with proper intents for DMs
+          ws.send(
+            JSON.stringify({
+              op: 2, // Identify
+              d: {
+                token: discordToken,
+                properties: {
+                  $os: "windows",
+                  $browser: "chrome",
+                  $device: "chrome",
+                },
+                // Explicitly include DIRECT_MESSAGES intent (1 << 12)
+                intents: 4609, // GUILDS (1 << 0) | GUILD_MESSAGES (1 << 9) | DIRECT_MESSAGES (1 << 12) | MESSAGE_CONTENT (1 << 15)
               },
-              // Explicitly include DIRECT_MESSAGES intent (1 << 12)
-              intents: 4609, // GUILDS (1 << 0) | GUILD_MESSAGES (1 << 9) | DIRECT_MESSAGES (1 << 12) | MESSAGE_CONTENT (1 << 15)
-            },
-          })
-        );
+            })
+          );
+        } catch (error) {
+          console.error(
+            `[Process ${processId}] Error sending identify payload:`,
+            error
+          );
+        }
       });
 
       // Handle incoming messages from Discord

@@ -120,8 +120,34 @@ export default function AutoStatusUpdaterStatusPage() {
   };
 
   // Go back to input form (only if process is stopped)
-  const handleNewProcess = () => {
-    router.push("/tools/auto-status-updater");
+  const handleNewProcess = async () => {
+    // Check if there's an active process before going back
+    try {
+      const response = await fetch(
+        "/api/tools/auto-status-updater/active-process"
+      );
+      const data = await response.json();
+
+      // If there's still an active process, don't allow going back to the input page
+      if (data.success && data.hasActiveProcess) {
+        // If it's the same process, refresh this page
+        if (data.processId === processId) {
+          window.location.reload();
+        } else {
+          // If it's a different process, redirect to that process's status page
+          router.push(
+            `/tools/auto-status-updater/status?processId=${data.processId}`
+          );
+        }
+      } else {
+        // Only go back to the input page if there's no active process
+        router.push("/tools/auto-status-updater");
+      }
+    } catch (err) {
+      console.error("Error checking active processes:", err);
+      // If error checking, default to not allowing navigation back
+      setError("Failed to check active processes. Please try again.");
+    }
   };
 
   return (

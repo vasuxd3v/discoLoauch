@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
-import ThemeToggle from "./ThemeToggle";
 import Image from "next/image";
 
 export default function Navbar() {
@@ -36,7 +35,7 @@ export default function Navbar() {
             Home
           </Link>
           <Link
-            href="/documentation"
+            href="/docs"
             className="font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
           >
             Documentation
@@ -53,21 +52,10 @@ export default function Navbar() {
           >
             About Us
           </Link>
-          <Link
-            href="/monitoring"
-            className="font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-          >
-            Monitoring
-          </Link>
         </div>
 
-        {/* Right Side Items: Theme Toggle & Login Button */}
+        {/* Right Side Items: Login Button */}
         <div className="hidden md:flex items-center gap-4">
-          {/* Theme Toggle */}
-          <div className="mr-2">
-            <ThemeToggle />
-          </div>
-
           {/* User Authentication */}
           {status === "loading" ? (
             <div className="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700 animate-pulse"></div>
@@ -90,6 +78,7 @@ export default function Navbar() {
                     }
                     alt="User avatar"
                     fill
+                    sizes="28px"
                     className="object-cover"
                   />
                 </div>
@@ -233,11 +222,8 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile Menu Button & Theme Toggle */}
+        {/* Mobile Menu Button */}
         <div className="md:hidden flex items-center gap-3">
-          {/* Mobile Theme Toggle */}
-          <ThemeToggle />
-
           {/* Mobile Auth Button */}
           {status !== "loading" && !session && (
             <button
@@ -274,6 +260,7 @@ export default function Navbar() {
                   }
                   alt="User avatar"
                   fill
+                  sizes="32px"
                   className="object-cover"
                 />
               </button>
@@ -378,7 +365,7 @@ export default function Navbar() {
               Home
             </Link>
             <Link
-              href="/documentation"
+              href="/docs"
               className="font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-2"
             >
               Documentation
@@ -394,12 +381,6 @@ export default function Navbar() {
               className="font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-2"
             >
               About Us
-            </Link>
-            <Link
-              href="/monitoring"
-              className="font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-2"
-            >
-              Monitoring
             </Link>
 
             {/* Mobile Profile Link for authenticated users */}

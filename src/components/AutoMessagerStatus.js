@@ -168,13 +168,18 @@ export default function AutoMessagerStatus({ processId }) {
     );
   }
 
-  // Format channel ID for display (truncate if needed)
-  const displayChannelId =
-    status.channelId.length > 15
-      ? `${status.channelId.substring(0, 7)}...${status.channelId.substring(
-          status.channelId.length - 7
+  // Format channel IDs for display
+  const formatChannelId = (channelId) => {
+    return channelId.length > 15
+      ? `${channelId.substring(0, 7)}...${channelId.substring(
+          channelId.length - 7
         )}`
-      : status.channelId;
+      : channelId;
+  };
+
+  // Handle both legacy single channelId and new array of channelIds
+  const channelIds =
+    status.channelIds || (status.channelId ? [status.channelId] : []);
 
   // Calculate elapsed time
   const startTime = new Date(status.startTime);
@@ -209,8 +214,25 @@ export default function AutoMessagerStatus({ processId }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-gray-900 p-4 rounded-lg border border-gray-700">
-          <div className="text-sm text-gray-400 mb-1">Channel ID</div>
-          <div className="font-mono text-blue-400">{displayChannelId}</div>
+          <div className="text-sm text-gray-400 mb-1">
+            Channel ID{channelIds.length > 1 ? "s" : ""}
+          </div>
+          <div className="font-mono text-blue-400">
+            {channelIds.length === 0 ? (
+              <span className="text-gray-500">No channels</span>
+            ) : channelIds.length === 1 ? (
+              formatChannelId(channelIds[0])
+            ) : (
+              <div className="space-y-2">
+                {channelIds.map((channelId, index) => (
+                  <div key={index} className="flex items-center">
+                    <span className="text-gray-500 mr-2">{index + 1}.</span>
+                    {formatChannelId(channelId)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="bg-gray-900 p-4 rounded-lg border border-gray-700">

@@ -37,7 +37,6 @@ async function isUserAuthorized(userId) {
 export async function GET(request) {
   try {
     const session = await getServerSession();
-    console.log("SESSION:", session);
     if (!session || !session.user) {
       return NextResponse.json(
         { error: "Unauthorized - No session" },
@@ -174,7 +173,11 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const session = await getServerSession();
-    console.log("SESSION:", session);
+    console.log("SESSION:", JSON.stringify(session));
+
+    // Read request body
+    const body = await request.json();
+
     if (!session || !session.user) {
       return NextResponse.json(
         { error: "Unauthorized - No session" },
@@ -195,6 +198,11 @@ export async function POST(request) {
       userId = session.user.id;
       console.log(`Using session.user.id: ${userId}`);
     }
+    // Check if userId was passed in the request body
+    else if (body.userId) {
+      userId = body.userId;
+      console.log(`Using userId from request body: ${userId}`);
+    }
     // Try to extract from the image URL if it's a Discord CDN URL
     else if (
       session.user.image &&
@@ -205,7 +213,14 @@ export async function POST(request) {
       if (matches && matches[1]) {
         userId = matches[1];
         console.log(`Extracted Discord ID from avatar URL: ${userId}`);
+      } else {
+        console.error(
+          "Failed to extract Discord ID from URL:",
+          session.user.image
+        );
       }
+    } else {
+      console.log("No Discord avatar URL found in session:", session.user);
     }
 
     // If we still don't have an ID, try to match the name with records in Firebase
@@ -226,7 +241,11 @@ export async function POST(request) {
             console.log(
               `Found user ID ${userId} matching username ${session.user.name} in Firebase`
             );
+          } else {
+            console.log(`No matching username found for ${session.user.name}`);
           }
+        } else {
+          console.log("No users found in Firebase database");
         }
       } catch (error) {
         console.error("Error searching for user by name:", error);
@@ -234,9 +253,12 @@ export async function POST(request) {
     }
 
     if (!userId) {
-      console.error("No user ID found in session:", session.user);
+      console.error(
+        "No user ID found in session:",
+        JSON.stringify(session.user)
+      );
       return NextResponse.json(
-        { error: "Discord ID not found in session" },
+        { error: "Discord ID not found in session", success: false },
         { status: 401 }
       );
     }
@@ -253,7 +275,6 @@ export async function POST(request) {
       );
     }
 
-    const body = await request.json();
     const { action } = body;
 
     if (!action) {
@@ -276,9 +297,9 @@ export async function POST(request) {
         );
     }
   } catch (error) {
-    console.error("Error in Auto Status Updater API:", error);
+    console.error("Error in POST auto-status-updater:", error);
     return NextResponse.json(
-      { error: "Internal server error", success: false },
+      { error: "Server error", success: false },
       { status: 500 }
     );
   }
@@ -312,9 +333,15 @@ async function handleStart(data, session) {
   }
 
   try {
-    // Check if user already has an active process
-    const userId = session.user?.discord?.id;
+    // Get user ID with multiple fallbacks
+    const userId = session.user?.id || session.user?.discord?.id || data.userId;
+    console.log("handleStart using userId:", userId);
+
     if (!userId) {
+      console.error(
+        "User ID not found in handleStart:",
+        JSON.stringify(session.user)
+      );
       return NextResponse.json(
         { error: "Discord user ID not found", success: false },
         { status: 401 }
