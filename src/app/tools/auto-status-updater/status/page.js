@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 
-export default function AutoStatusUpdaterStatusPage() {
+function AutoStatusUpdaterStatusContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const processId = searchParams.get("processId");
@@ -371,5 +371,19 @@ export default function AutoStatusUpdaterStatusPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AutoStatusUpdaterStatusPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-900">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        </div>
+      }
+    >
+      <AutoStatusUpdaterStatusContent />
+    </Suspense>
   );
 }

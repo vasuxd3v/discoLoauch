@@ -152,6 +152,41 @@ export default function useSimpleDiscordGateway({
   }, []);
 
   // Handle incoming messages
+  const handleDirectMessage = useCallback(
+    (message) => {
+      // Check if this is a DM
+      const isDM = message.guild_id === null && !message.webhook_id;
+
+      // Skip our own messages
+      if (message.author.id === userIdRef.current) {
+        return;
+      }
+
+      if (isDM) {
+        logDebug(
+          `Received DM from ${message.author.username} (${message.author.id})`
+        );
+
+        // If replyToAllDms is false, check if this is a new DM (no previous messages)
+        if (!replyToAllDms) {
+          // This is a simplification - in reality we'd need to check message history
+          // But for this implementation we'll use the lastReplyTimestampsRef as a proxy
+          if (lastReplyTimestampsRef.current[message.author.id]) {
+            logDebug(
+              `Not replying to existing conversation with ${message.author.id}`
+            );
+            return;
+          }
+        }
+
+        // Send reply to this DM
+        sendMessage(message.channel_id);
+      }
+    },
+    [sendMessage, replyToAllDms, logDebug]
+  );
+
+  // Handle incoming messages
   const handleMessage = useCallback(
     (event) => {
       try {
@@ -202,42 +237,7 @@ export default function useSimpleDiscordGateway({
         logDebug(`Error handling WebSocket message: ${error.message}`);
       }
     },
-    [token, sendHeartbeat, logDebug]
-  );
-
-  // Handle direct messages
-  const handleDirectMessage = useCallback(
-    (message) => {
-      // Check if this is a DM
-      const isDM = message.guild_id === null && !message.webhook_id;
-
-      // Skip our own messages
-      if (message.author.id === userIdRef.current) {
-        return;
-      }
-
-      if (isDM) {
-        logDebug(
-          `Received DM from ${message.author.username} (${message.author.id})`
-        );
-
-        // If replyToAllDms is false, check if this is a new DM (no previous messages)
-        if (!replyToAllDms) {
-          // This is a simplification - in reality we'd need to check message history
-          // But for this implementation we'll use the lastReplyTimestampsRef as a proxy
-          if (lastReplyTimestampsRef.current[message.author.id]) {
-            logDebug(
-              `Not replying to existing conversation with ${message.author.id}`
-            );
-            return;
-          }
-        }
-
-        // Send reply to this DM
-        sendMessage(message.channel_id);
-      }
-    },
-    [sendMessage, replyToAllDms, logDebug]
+    [token, sendHeartbeat, logDebug, handleDirectMessage]
   );
 
   // Connect to Discord gateway
