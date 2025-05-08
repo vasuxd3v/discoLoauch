@@ -70,29 +70,6 @@ const commands = [
       },
     ],
   },
-  {
-    name: "auto_reply",
-    description: "Configure auto-reply for direct messages",
-    options: [
-      {
-        name: "action",
-        description: "Action to perform",
-        type: 3, // STRING type
-        required: true,
-        choices: [
-          { name: "enable", value: "enable" },
-          { name: "disable", value: "disable" },
-          { name: "status", value: "status" },
-        ],
-      },
-      {
-        name: "message",
-        description: "Auto-reply message (only needed for enable)",
-        type: 3, // STRING type
-        required: false,
-      },
-    ],
-  },
 ];
 
 const rest = new REST({ version: "10" }).setToken(
