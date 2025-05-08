@@ -1,3 +1,9 @@
 {
-  "/page": "app/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/tools/auto-dm-reply/route": "app/api/tools/auto-dm-reply/route.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/page": "app/page.js",
+  "/tools/auto-dm-reply/page": "app/tools/auto-dm-reply/page.js",
+  "/tools/auto-dm-reply/status/page": "app/tools/auto-dm-reply/status/page.js"
 }
