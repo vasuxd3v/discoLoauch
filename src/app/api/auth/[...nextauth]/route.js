@@ -10,6 +10,12 @@ const AUTHORIZED_DISCORD_IDS = (process.env.AUTHORIZED_DISCORD_IDS || "")
   .split(",")
   .map((id) => id.trim());
 
+const baseUrl =
+  process.env.NEXTAUTH_URL ||
+  (process.env.NODE_ENV === "production"
+    ? "https://autoxpulse.live"
+    : "http://localhost:3000");
+
 const handler = NextAuth({
   providers: [
     DiscordProvider({

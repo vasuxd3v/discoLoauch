@@ -14,6 +14,28 @@ const nextConfig = {
       },
     ],
   },
+  // Add output option for standalone production builds
+  output: process.env.NODE_ENV === "production" ? "standalone" : undefined,
+  // Optimization settings
+  swcMinify: true,
+  reactStrictMode: true,
+  // Cross-origin configuration
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "Access-Control-Allow-Origin",
+            value:
+              process.env.NODE_ENV === "production"
+                ? "https://autoxpulse.live"
+                : "http://localhost:3000",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

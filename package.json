@@ -6,6 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
+    "start:production": "NODE_ENV=production concurrently \"npm run start\" \"npm run bot\"",
+    "railway:start": "npm install && NODE_ENV=production node src/discord-bot/bot.js",
     "lint": "next lint",
     "bot": "node src/discord-bot/bot.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run bot\""
