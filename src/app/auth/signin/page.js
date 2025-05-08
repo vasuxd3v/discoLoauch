@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, Suspense } from "react";
 import Link from "next/link";
 
-export default function SignInContent() {
+function SignInContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
   const callbackUrl = searchParams.get("callbackUrl") || "/";
@@ -105,6 +105,7 @@ export default function SignInContent() {
     </div>
   );
 }
+
 export default function SignIn() {
   return (
     <Suspense
