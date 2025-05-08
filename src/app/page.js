@@ -24,12 +24,11 @@ export default function Home() {
       <section className="pt-28 pb-16 md:pt-36 md:pb-24 px-6">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-purple-600 via-blue-500 to-indigo-600 text-transparent bg-clip-text">
-            Automate Your Social Media Presence
+            AutoXPulse Reimagined
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-10">
-            Powerful automation tools to enhance your online communication and
-            engagement. Save time and increase productivity with our suite of
-            intelligent assistants.
+            Effortlessly automate your Discord experience with powerful tools
+            that save time and enhance engagement. No coding required.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

@@ -2,10 +2,10 @@
 
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import Link from "next/link";
 
-export default function SignIn() {
+export default function SignInContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
   const callbackUrl = searchParams.get("callbackUrl") || "/";
@@ -103,5 +103,18 @@ export default function SignIn() {
         </div>
       </div>
     </div>
+  );
+}
+export default function SignIn() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        </div>
+      }
+    >
+      <SignInContent />
+    </Suspense>
   );
 }

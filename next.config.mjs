@@ -17,7 +17,6 @@ const nextConfig = {
   // Add output option for standalone production builds
   output: process.env.NODE_ENV === "production" ? "standalone" : undefined,
   // Optimization settings
-  swcMinify: true,
   reactStrictMode: true,
   // Cross-origin configuration
   async headers() {
