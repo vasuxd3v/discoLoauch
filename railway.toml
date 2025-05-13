@@ -1,7 +1,20 @@
+# Railway deployment configuration
+
 [build]
 builder = "nixpacks"
-buildCommand = "npm install"
+buildCommand = "npm ci && npm run railway:web-build"
 
 [deploy]
-startCommand = "node src/discord-bot/bot.js"
-restartPolicy = "always"
+startCommand = "npm run railway:web-start"
+restartPolicy = "always" 
+healthcheckPath = "/"
+healthcheckTimeout = 180
+
+[nixpacks]
+node_version = "18"
+install_cache = true
+
+[env]
+# Memory optimization
+NODE_ENV = "production"
+NEXT_TELEMETRY_DISABLED = "1"

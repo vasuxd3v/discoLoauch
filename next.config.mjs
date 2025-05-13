@@ -18,6 +18,7 @@ const nextConfig = {
   output: process.env.NODE_ENV === "production" ? "standalone" : undefined,
   // Optimization settings
   reactStrictMode: true,
+  // No experimental features to reduce build issues
   // Cross-origin configuration
   async headers() {
     return [
