@@ -189,18 +189,7 @@ export default function Navbar() {
                   {/* Sign out button */}
                   <div className="p-2 border-t border-gray-200 dark:border-gray-700">
                     <button
-                      onClick={async () => {
-                        try {
-                          await signOut({
-                            callbackUrl: "/",
-                            redirect: true,
-                          });
-                        } catch (error) {
-                          console.error("Sign out error:", error);
-                          // Fallback: redirect to home page if there's an error
-                          window.location.href = "/";
-                        }
-                      }}
+                      onClick={() => signOut({ callbackUrl: "/" })}
                       className="flex w-full items-center px-3 py-2 text-sm text-left text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
                     >
                       Sign out
@@ -305,18 +294,7 @@ export default function Navbar() {
                       Your Profile
                     </Link>
                     <button
-                      onClick={async () => {
-                        try {
-                          await signOut({
-                            callbackUrl: "/",
-                            redirect: true,
-                          });
-                        } catch (error) {
-                          console.error("Sign out error:", error);
-                          // Fallback: redirect to home page if there's an error
-                          window.location.href = "/";
-                        }
-                      }}
+                      onClick={() => signOut({ callbackUrl: "/" })}
                       className="flex w-full items-center px-3 py-2 text-sm text-left text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
                     >
                       Sign out
@@ -464,18 +442,7 @@ export default function Navbar() {
 
             {session && (
               <button
-                onClick={async () => {
-                  try {
-                    await signOut({
-                      callbackUrl: "/",
-                      redirect: true,
-                    });
-                  } catch (error) {
-                    console.error("Sign out error:", error);
-                    // Fallback: redirect to home page if there's an error
-                    window.location.href = "/";
-                  }
-                }}
+                onClick={() => signOut({ callbackUrl: "/" })}
                 className="font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors py-2 border-t border-gray-200 dark:border-gray-700 mt-2"
               >
                 Sign out
